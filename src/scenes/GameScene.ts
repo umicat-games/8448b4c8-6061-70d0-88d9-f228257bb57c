@@ -44,6 +44,27 @@ export class GameScene extends Phaser.Scene {
         .setOrigin(0.5);
     }
 
+    // Bright red bouncing square in the center
+    const squareSize = 80;
+    const square = this.add.rectangle(
+      GAME_WIDTH / 2,
+      GAME_HEIGHT / 2,
+      squareSize,
+      squareSize,
+      0xff2222
+    );
+    square.setDepth(2);
+
+    // Bounce tween — moves up 60px and back down, repeating forever
+    this.tweens.add({
+      targets: square,
+      y: GAME_HEIGHT / 2 - 60,
+      duration: 500,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+    });
+
     // Behavior wiring goes below this line. Look entities up via
     //   const player = getEntityRegistry(this)?.byRole('player')[0];
     // See SDK-GUIDE.md and `scenes/manifest.json`.
