@@ -36,13 +36,27 @@ export class GameScene extends Phaser.Scene {
 
     if (sceneFile.entities.length === 0) {
       this.add
-        .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'Describe your game\nin the chat!', {
+        .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 120, 'Describe your game\nin the chat!', {
           fontSize: '28px',
           color: '#ffffff',
           align: 'center',
         })
         .setOrigin(0.5);
     }
+
+    // Bright red bouncing square in the center
+    const squareSize = 80;
+    const square = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, squareSize, squareSize, 0xff2222);
+    square.setDepth(2);
+
+    this.tweens.add({
+      targets: square,
+      y: GAME_HEIGHT / 2 - 80,
+      duration: 500,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+    });
 
     // Behavior wiring goes below this line. Look entities up via
     //   const player = getEntityRegistry(this)?.byRole('player')[0];
