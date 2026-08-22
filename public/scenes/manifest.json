@@ -5,10 +5,25 @@
   "version": "1.0.0",
   "initialScene": "main",
   "scenes": [
-    { "id": "main", "type": "world", "file": "world/main.json", "hud": "game-hud" }
+    {
+      "id": "main",
+      "type": "world",
+      "file": "world/main.json",
+      "hud": "game-hud"
+    },
+    {
+      "id": "main-copy",
+      "name": "main copy",
+      "type": "world",
+      "file": "world/main-copy.json",
+      "hud": "game-hud"
+    }
   ],
   "huds": [
-    { "id": "game-hud", "file": "hud/game-hud.json" }
+    {
+      "id": "game-hud",
+      "file": "hud/game-hud.json"
+    }
   ],
   "assets": []
 }

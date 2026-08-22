@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "main-copy",
+  "name": "main copy",
+  "type": "world",
+  "world": {
+    "width": 1280,
+    "height": 720,
+    "background": {
+      "color": "#1a1a2e"
+    }
+  },
+  "camera": {
+    "follow": null,
+    "bounds": {
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "entities": []
+}
