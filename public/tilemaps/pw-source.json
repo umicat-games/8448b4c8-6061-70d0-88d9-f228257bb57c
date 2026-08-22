@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "pw-source",
-  "name": "PW Source",
+  "name": "PW Renamed",
   "tileSize": {
     "width": 32,
     "height": 32
@@ -13,7 +13,8 @@
   "humanCurated": true,
   "metadata": {
     "createdAt": "2026-08-22T14:31:56.742Z",
-    "author": "user"
+    "author": "user",
+    "editedAt": "2026-08-22T14:41:47.698Z"
   },
   "layers": [
     {
