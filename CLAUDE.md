@@ -70,5 +70,14 @@ until the camera crosses to the other side.
 controller a constant downward offset each frame passes a wall test and fails a
 step test. `CharacterController3D` already handles this.
 
+**A character that moves is not a character that is animating.** The scene
+starts one clip and the SDK exposes the mixer, but nothing switches it — so
+without the idle/walk swap in `main.ts` the character slides around playing its
+idle animation. That reads as "no animation", and it survives a test that only
+asks whether bones moved, because idle moves bones too. Cross-fade between
+clips; a cut looks like teleporting between poses. Under ADR-034 this belongs
+in the platform eventually — once every game shares one character, which clip
+plays when you move is the character's behaviour, not the game's.
+
 **UI is DOM.** There is no reason to draw a score with triangles on the web;
 `index.html` has a `#hud` div for exactly this.
