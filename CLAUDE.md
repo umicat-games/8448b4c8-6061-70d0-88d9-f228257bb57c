@@ -56,6 +56,11 @@ follow its bones, so three.js culls a character against a stale volume and it
 vanishes the moment it moves. `loadScene3D` already sets `frustumCulled = false`
 on skinned meshes; if you add a character by hand, do the same.
 
+**The world's unit is Kenney's, not the metre.** A character is 0.72 units tall,
+so ~4,700 CC0 props drop in at `importScale: 1`. Anything length-shaped you add —
+sizes, positions, collider extents, camera offsets, speeds, **and gravity** —
+lives in that unit. See ASSETS.md.
+
 **Rotate geometry, not objects, when orienting a primitive.** An object's
 rotation is overwritten by the entity's authored transform. Getting this wrong
 once left every "ground" standing upright as a wall, which renders convincingly

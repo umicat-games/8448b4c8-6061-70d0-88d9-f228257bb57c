@@ -38,10 +38,16 @@ async function start(): Promise<void> {
   const hero = world.entities.get('hero')!;
   const saved = (await umicat.saves.get<{ x: number; y: number; z: number }>(SAVE_KEY)) ?? null;
 
+  // Sized for THIS character and this world's unit. The capsule's total height
+  // is 2*halfHeight + 2*radius = 0.72, which is the character's own height —
+  // a collider that does not match the model is how a character ends up
+  // floating, sunk, or catching on things that are not there.
   const character = new CharacterController3D(world.world, RAPIER, {
-    position: saved ?? { x: 0, y: 1, z: 4 },
-    speed: 4.5,
-    stepHeight: 0.4,
+    position: saved ?? { x: 0, y: 0.4, z: 1.7 },
+    halfHeight: 0.2,
+    radius: 0.16,
+    speed: 1.9,        // ~2.6 character-heights per second, as before
+    stepHeight: 0.17,  // a quarter of the character's height, as before
   });
   const input = new Input3D();
 
@@ -78,7 +84,7 @@ async function start(): Promise<void> {
     const dir = input.direction();
 
     character.update(dt, dir);
-    character.syncTo(hero, -0.85);          // capsule centre → the model's feet
+    character.syncTo(hero, -0.36);          // capsule centre → the model's feet (halfHeight + radius)
     character.faceTowards(hero, dir, dt);
     if (Math.hypot(dir.x, dir.z) > 0) save();
 

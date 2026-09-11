@@ -11,17 +11,25 @@
     {
       "id": "hero",
       "path": "assets/character.glb",
-      "importScale": 0.35,
+      "importScale": 1,
       "animations": {
-        "idle": "HumanArmature|Man_Idle",
-        "walk": "HumanArmature|Man_Walk",
-        "run": "HumanArmature|Man_Run",
-        "jump": "HumanArmature|Man_Jump",
-        "runningJump": "HumanArmature|Man_RunningJump",
-        "sit": "HumanArmature|Man_Sitting",
-        "clap": "HumanArmature|Man_Clapping",
-        "punch": "HumanArmature|Man_Punch",
-        "die": "HumanArmature|Man_Death"
+        "idle": "idle",
+        "walk": "walk",
+        "run": "sprint",
+        "jump": "jump",
+        "fall": "fall",
+        "crouch": "crouch",
+        "sit": "sit",
+        "drive": "drive",
+        "die": "die",
+        "pickUp": "pick-up",
+        "interact": "interact-right",
+        "holdRight": "holding-right",
+        "holdBoth": "holding-both",
+        "attack": "attack-melee-right",
+        "kick": "attack-kick-right",
+        "yes": "emote-yes",
+        "no": "emote-no"
       }
     }
   ]

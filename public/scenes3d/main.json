@@ -6,9 +6,9 @@
     "background": "#8fc9e8"
   },
   "gravity": {
-    "x": 0,
-    "y": -9.81,
-    "z": 0
+    "x": 0.0,
+    "y": -4.1692,
+    "z": 0.0
   },
   "lights": [
     {
@@ -16,9 +16,9 @@
       "kind": "directional",
       "intensity": 2.1,
       "position": {
-        "x": 8,
-        "y": 14,
-        "z": 6
+        "x": 3.4,
+        "y": 5.95,
+        "z": 2.55
       },
       "castShadow": true
     },
@@ -36,17 +36,17 @@
       "primitive": {
         "kind": "plane",
         "size": {
-          "x": 30,
-          "y": 1,
-          "z": 30
+          "x": 12.75,
+          "y": 0.425,
+          "z": 12.75
         },
         "color": "#7f8a6a"
       },
       "transform": {
         "position": {
-          "x": 0,
-          "y": 0,
-          "z": 0
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
         }
       },
       "collider": {
@@ -54,9 +54,9 @@
         "shape": {
           "kind": "box",
           "halfExtents": {
-            "x": 15,
-            "y": 0.05,
-            "z": 15
+            "x": 6.375,
+            "y": 0.0213,
+            "z": 6.375
           }
         }
       }
@@ -66,17 +66,17 @@
       "primitive": {
         "kind": "box",
         "size": {
-          "x": 20,
-          "y": 2,
-          "z": 0.5
+          "x": 8.5,
+          "y": 0.85,
+          "z": 0.2125
         },
         "color": "#b9a382"
       },
       "transform": {
         "position": {
-          "x": 0,
-          "y": 1,
-          "z": -10
+          "x": 0.0,
+          "y": 0.425,
+          "z": -4.25
         }
       },
       "collider": {
@@ -84,9 +84,9 @@
         "shape": {
           "kind": "box",
           "halfExtents": {
-            "x": 10,
-            "y": 1,
-            "z": 0.25
+            "x": 4.25,
+            "y": 0.425,
+            "z": 0.1062
           }
         }
       }
@@ -96,17 +96,17 @@
       "primitive": {
         "kind": "box",
         "size": {
-          "x": 1,
-          "y": 1,
-          "z": 1
+          "x": 0.425,
+          "y": 0.425,
+          "z": 0.425
         },
         "color": "#d9a44f"
       },
       "transform": {
         "position": {
-          "x": 3,
-          "y": 4,
-          "z": -2
+          "x": 1.275,
+          "y": 1.7,
+          "z": -0.85
         }
       },
       "collider": {
@@ -114,9 +114,9 @@
         "shape": {
           "kind": "box",
           "halfExtents": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
+            "x": 0.2125,
+            "y": 0.2125,
+            "z": 0.2125
           }
         }
       }
@@ -127,9 +127,9 @@
       "name": "hero",
       "transform": {
         "position": {
-          "x": 0,
-          "y": 0,
-          "z": 4
+          "x": 0.0,
+          "y": 0.0,
+          "z": 1.7
         }
       },
       "animation": {
@@ -142,9 +142,9 @@
     "kind": "follow",
     "target": "hero",
     "offset": {
-      "x": 0,
-      "y": 2.6,
-      "z": 5.5
+      "x": 0.0,
+      "y": 1.105,
+      "z": 2.3375
     },
     "fov": 55
   }
