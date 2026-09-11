@@ -47,6 +47,36 @@ numbers below), not just by inspection:
   cost some hearts (the sim doesn't model the platform climb or missed
   inputs), but the ceiling is now "beatable," not "impossible."
 
+## Platform heights (this turn — fixed after a real playtest)
+
+A playtest found the jump platform course unclimbable with a light tap of
+the jump button: a tap jump measured ~0.45 tall in the real game, but
+`step_low`'s top surface was at 0.495 — just above reach — so the course
+was leveled for the FULL held-jump height (~0.94) instead of the minimum
+tap height, and a player who tapped instead of held would conclude the
+platform simply wasn't reachable.
+
+Fix: dropped every step's rise to a flat 0.30 (comfortably under the
+measured ~0.45 tap height, not the ~0.94 hold height), and moved
+`enemy_oozi` down to match the new, lower `step_top` surface. Checked
+numerically after the edit rather than just re-reading the numbers (base
+height + that model's real slab thickness = top surface; top surface minus
+the previous step's top surface = the rise a jump actually has to clear):
+
+| step | base y | slab thickness | top surface | rise from previous |
+|---|---|---|---|---|
+| ground | — | — | 0.000 | — |
+| `step_low` | 0.105 | 0.195 (`platform`) | 0.300 | 0.300 |
+| `step_mid` | 0.405 | 0.195 (`platform`) | 0.600 | 0.300 |
+| `step_top` | 0.695 | 0.205 (`platform-fortified`) | 0.900 | 0.300 |
+
+Every rise is a flat 0.300 — under the measured tap-jump height with
+margin, and well under the held-jump height, so both a tap and a hold clear
+the whole course. `enemy_oozi`'s physics spawn (`ENEMY_DEFS` in
+`src/main.ts`) sits at `step_top`'s new surface (0.900) plus its capsule's
+half-height + radius (0.45) = 1.35; the scene entity's decorative position
+matches (feet at 0.9, since the model's own origin is at its feet).
+
 ## Current implementation
 
 - **Manifest** (`public/scenes3d/manifest.json`): added `platform-fortified`,

@@ -74,7 +74,7 @@ const ENEMY_DEFS: EnemyDef[] = [
   // Stationed on the top platform — its leash is short enough that it never
   // wanders off the edge; the player has to climb up to reach it. Reaching it
   // at all is already gated by the platform course, so it wakes up immediately.
-  { id: 'enemy_oozi', modelAssetId: 'enemy-oozi', spawn: { x: 5.4, y: 1.75, z: -3.0 }, leash: 0.35, detectRadius: 3.4, speed: 0.8, hp: 2, activateAt: 0 },
+  { id: 'enemy_oozi', modelAssetId: 'enemy-oozi', spawn: { x: 5.4, y: 1.35, z: -3.0 }, leash: 0.35, detectRadius: 3.4, speed: 0.8, hp: 2, activateAt: 0 },
 ];
 
 interface EnemyRuntime {
