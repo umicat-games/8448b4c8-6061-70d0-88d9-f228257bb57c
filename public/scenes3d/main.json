@@ -62,36 +62,6 @@
       }
     },
     {
-      "id": "wall_back",
-      "primitive": {
-        "kind": "box",
-        "size": {
-          "x": 8.5,
-          "y": 0.85,
-          "z": 0.2125
-        },
-        "color": "#b9a382"
-      },
-      "transform": {
-        "position": {
-          "x": 0.0,
-          "y": 0.425,
-          "z": -4.25
-        }
-      },
-      "collider": {
-        "body": "fixed",
-        "shape": {
-          "kind": "box",
-          "halfExtents": {
-            "x": 4.25,
-            "y": 0.425,
-            "z": 0.1062
-          }
-        }
-      }
-    },
-    {
       "id": "crate",
       "primitive": {
         "kind": "box",
@@ -119,6 +89,130 @@
             "z": 0.2125
           }
         }
+      }
+    },
+    {
+      "id": "wall_north",
+      "name": "wall_north",
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 0.425,
+          "z": -6.275
+        }
+      },
+      "primitive": {
+        "kind": "box",
+        "size": {
+          "x": 12.75,
+          "y": 0.85,
+          "z": 0.2
+        },
+        "color": "#7a6a55"
+      },
+      "collider": {
+        "shape": {
+          "kind": "box",
+          "halfExtents": {
+            "x": 6.375,
+            "y": 0.425,
+            "z": 0.1
+          }
+        },
+        "body": "fixed"
+      }
+    },
+    {
+      "id": "wall_south",
+      "name": "wall_south",
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 0.425,
+          "z": 6.275
+        }
+      },
+      "primitive": {
+        "kind": "box",
+        "size": {
+          "x": 12.75,
+          "y": 0.85,
+          "z": 0.2
+        },
+        "color": "#7a6a55"
+      },
+      "collider": {
+        "shape": {
+          "kind": "box",
+          "halfExtents": {
+            "x": 6.375,
+            "y": 0.425,
+            "z": 0.1
+          }
+        },
+        "body": "fixed"
+      }
+    },
+    {
+      "id": "wall_west",
+      "name": "wall_west",
+      "transform": {
+        "position": {
+          "x": -6.275,
+          "y": 0.425,
+          "z": 0
+        }
+      },
+      "primitive": {
+        "kind": "box",
+        "size": {
+          "x": 0.2,
+          "y": 0.85,
+          "z": 12.75
+        },
+        "color": "#7a6a55"
+      },
+      "collider": {
+        "shape": {
+          "kind": "box",
+          "halfExtents": {
+            "x": 0.1,
+            "y": 0.425,
+            "z": 6.375
+          }
+        },
+        "body": "fixed"
+      }
+    },
+    {
+      "id": "wall_east",
+      "name": "wall_east",
+      "transform": {
+        "position": {
+          "x": 6.275,
+          "y": 0.425,
+          "z": 0
+        }
+      },
+      "primitive": {
+        "kind": "box",
+        "size": {
+          "x": 0.2,
+          "y": 0.85,
+          "z": 12.75
+        },
+        "color": "#7a6a55"
+      },
+      "collider": {
+        "shape": {
+          "kind": "box",
+          "halfExtents": {
+            "x": 0.1,
+            "y": 0.425,
+            "z": 6.375
+          }
+        },
+        "body": "fixed"
       }
     },
     {
