@@ -62,36 +62,6 @@
       }
     },
     {
-      "id": "crate",
-      "primitive": {
-        "kind": "box",
-        "size": {
-          "x": 0.425,
-          "y": 0.425,
-          "z": 0.425
-        },
-        "color": "#d9a44f"
-      },
-      "transform": {
-        "position": {
-          "x": 1.275,
-          "y": 1.7,
-          "z": -0.85
-        }
-      },
-      "collider": {
-        "body": "dynamic",
-        "shape": {
-          "kind": "box",
-          "halfExtents": {
-            "x": 0.2125,
-            "y": 0.2125,
-            "z": 0.2125
-          }
-        }
-      }
-    },
-    {
       "id": "wall_north",
       "name": "wall_north",
       "transform": {
@@ -213,6 +183,206 @@
           }
         },
         "body": "fixed"
+      }
+    },
+    {
+      "id": "tree_a",
+      "name": "tree_a",
+      "modelAssetId": "tree",
+      "transform": {
+        "position": {
+          "x": -3.2,
+          "y": 0.0,
+          "z": -3.0
+        }
+      },
+      "collider": {
+        "shape": {
+          "kind": "box",
+          "halfExtents": {
+            "x": 0.09,
+            "y": 0.35,
+            "z": 0.09
+          }
+        },
+        "body": "fixed",
+        "offset": {
+          "x": 0,
+          "y": 0.35,
+          "z": 0
+        }
+      }
+    },
+    {
+      "id": "tree_b",
+      "name": "tree_b",
+      "modelAssetId": "tree-pine",
+      "transform": {
+        "position": {
+          "x": -4.4,
+          "y": 0.0,
+          "z": -1.4
+        }
+      },
+      "collider": {
+        "shape": {
+          "kind": "box",
+          "halfExtents": {
+            "x": 0.09,
+            "y": 0.35,
+            "z": 0.09
+          }
+        },
+        "body": "fixed",
+        "offset": {
+          "x": 0,
+          "y": 0.35,
+          "z": 0
+        }
+      }
+    },
+    {
+      "id": "rocks_a",
+      "name": "rocks_a",
+      "modelAssetId": "rocks",
+      "transform": {
+        "position": {
+          "x": 3.4,
+          "y": 0.0,
+          "z": -3.2
+        }
+      },
+      "collider": {
+        "shape": {
+          "kind": "box",
+          "halfExtents": {
+            "x": 0.22,
+            "y": 0.14,
+            "z": 0.22
+          }
+        },
+        "body": "fixed",
+        "offset": {
+          "x": 0,
+          "y": 0.14,
+          "z": 0
+        }
+      }
+    },
+    {
+      "id": "crate_a",
+      "name": "crate_a",
+      "modelAssetId": "crate",
+      "transform": {
+        "position": {
+          "x": 1.4,
+          "y": 0.0,
+          "z": -2.2
+        }
+      },
+      "collider": {
+        "shape": {
+          "kind": "box",
+          "halfExtents": {
+            "x": 0.2,
+            "y": 0.2,
+            "z": 0.2
+          }
+        },
+        "body": "fixed",
+        "offset": {
+          "x": 0,
+          "y": 0.2,
+          "z": 0
+        }
+      }
+    },
+    {
+      "id": "barrel_a",
+      "name": "barrel_a",
+      "modelAssetId": "barrel",
+      "transform": {
+        "position": {
+          "x": 2.2,
+          "y": 0.0,
+          "z": -2.4
+        }
+      },
+      "collider": {
+        "shape": {
+          "kind": "box",
+          "halfExtents": {
+            "x": 0.17,
+            "y": 0.22,
+            "z": 0.17
+          }
+        },
+        "body": "fixed",
+        "offset": {
+          "x": 0,
+          "y": 0.22,
+          "z": 0
+        }
+      }
+    },
+    {
+      "id": "coin_a",
+      "name": "coin_a",
+      "modelAssetId": "coin-gold",
+      "transform": {
+        "position": {
+          "x": 0.0,
+          "y": 0.35,
+          "z": -1.2
+        }
+      }
+    },
+    {
+      "id": "flag_a",
+      "name": "flag_a",
+      "modelAssetId": "flag",
+      "transform": {
+        "position": {
+          "x": -1.6,
+          "y": 0.0,
+          "z": -3.6
+        }
+      }
+    },
+    {
+      "id": "ladder_a",
+      "name": "ladder_a",
+      "modelAssetId": "ladder",
+      "transform": {
+        "position": {
+          "x": 4.2,
+          "y": 0.0,
+          "z": 0.4
+        }
+      }
+    },
+    {
+      "id": "platform_a",
+      "name": "platform_a",
+      "modelAssetId": "platform",
+      "transform": {
+        "position": {
+          "x": 2.6,
+          "y": 0.45,
+          "z": 1.2
+        }
+      }
+    },
+    {
+      "id": "spring_a",
+      "name": "spring_a",
+      "modelAssetId": "spring",
+      "transform": {
+        "position": {
+          "x": -2.4,
+          "y": 0.0,
+          "z": 1.6
+        }
       }
     },
     {

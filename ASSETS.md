@@ -55,10 +55,28 @@ its scenery. Without the file the model still loads and animates — it just
 renders **grey**, with a single console line, which is exactly the kind of
 failure that ships.
 
+## The prop kit
+
+`public/kit/` holds 86 ready models — Kenney's Platformer set, **CC0** — with a
+catalogue at `public/kit/index.json` (id, path, category). Declare one in
+`scenes3d/manifest.json` with `importScale: 1` and point an entity at it.
+
+**One kit, on purpose.** Kenney publishes ~4,700 CC0 props across forty-odd
+kits and they do NOT share a palette — each carries its own
+`Textures/colormap.png`, and mixing kits means mixing looks. A starter ships
+one complete vocabulary rather than a bigger, less coherent pile. Adding
+another kit means a new folder under `public/kit/` with its own `Textures/`,
+because the models reference that path relatively.
+
+**A prop with no `collider` is decoration** — that is often correct, and it is
+always a choice rather than an omission. Fit the collider to what should block:
+a tree's belongs around its trunk, not its canopy.
+
 ## Licensing
 
-`public/assets/character.glb` and `Textures/colormap.png` are from **Kenney's
-Mini Characters 1** and are **CC0** — public domain. Commercial use,
+`public/assets/character.glb`, its `Textures/colormap.png`, and everything in
+`public/kit/` are from **Kenney** (Mini Characters 1 and the Platformer Kit) and
+are **CC0** — public domain. Commercial use,
 modification and redistribution, with no attribution required.
 <https://kenney.nl>
 

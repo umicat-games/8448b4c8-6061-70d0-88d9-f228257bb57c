@@ -31,6 +31,56 @@
         "yes": "emote-yes",
         "no": "emote-no"
       }
+    },
+    {
+      "id": "tree",
+      "path": "kit/platformer/tree.glb",
+      "importScale": 1
+    },
+    {
+      "id": "tree-pine",
+      "path": "kit/platformer/tree-pine.glb",
+      "importScale": 1
+    },
+    {
+      "id": "rocks",
+      "path": "kit/platformer/rocks.glb",
+      "importScale": 1
+    },
+    {
+      "id": "crate",
+      "path": "kit/platformer/crate.glb",
+      "importScale": 1
+    },
+    {
+      "id": "barrel",
+      "path": "kit/platformer/barrel.glb",
+      "importScale": 1
+    },
+    {
+      "id": "coin-gold",
+      "path": "kit/platformer/coin-gold.glb",
+      "importScale": 1
+    },
+    {
+      "id": "flag",
+      "path": "kit/platformer/flag.glb",
+      "importScale": 1
+    },
+    {
+      "id": "ladder",
+      "path": "kit/platformer/ladder.glb",
+      "importScale": 1
+    },
+    {
+      "id": "platform",
+      "path": "kit/platformer/platform.glb",
+      "importScale": 1
+    },
+    {
+      "id": "spring",
+      "path": "kit/platformer/spring.glb",
+      "importScale": 1
     }
   ]
 }

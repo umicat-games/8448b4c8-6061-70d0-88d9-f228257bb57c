@@ -56,6 +56,10 @@ follow its bones, so three.js culls a character against a stale volume and it
 vanishes the moment it moves. `loadScene3D` already sets `frustumCulled = false`
 on skinned meshes; if you add a character by hand, do the same.
 
+**Use the prop kit before you draw scenery out of boxes.** `public/kit/` ships
+86 real models with a catalogue at `public/kit/index.json`. A coloured box named
+`crystal` is still a box, and a scene of them reads as a prototype.
+
 **The world's unit is Kenney's, not the metre.** A character is 0.72 units tall,
 so ~4,700 CC0 props drop in at `importScale: 1`. Anything length-shaped you add —
 sizes, positions, collider extents, camera offsets, speeds, **and gravity** —

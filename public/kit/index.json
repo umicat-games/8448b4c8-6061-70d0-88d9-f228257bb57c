@@ -1,0 +1,528 @@
+{
+ "_readme": "Props you can place in a scene. Add one to scenes3d/manifest.json `models` with importScale 1, then point an entity at it by modelAssetId. CC0 (Kenney). See ASSETS.md.",
+ "kits": [
+  {
+   "id": "platformer",
+   "source": "Kenney Platformer Kit",
+   "license": "CC0"
+  }
+ ],
+ "models": [
+  {
+   "id": "block-grass",
+   "path": "kit/platformer/block-grass.glb",
+   "category": "terrain",
+   "kb": 10
+  },
+  {
+   "id": "block-grass-corner",
+   "path": "kit/platformer/block-grass-corner.glb",
+   "category": "terrain",
+   "kb": 9
+  },
+  {
+   "id": "block-grass-curve",
+   "path": "kit/platformer/block-grass-curve.glb",
+   "category": "terrain",
+   "kb": 19
+  },
+  {
+   "id": "block-grass-edge",
+   "path": "kit/platformer/block-grass-edge.glb",
+   "category": "terrain",
+   "kb": 12
+  },
+  {
+   "id": "block-grass-hexagon",
+   "path": "kit/platformer/block-grass-hexagon.glb",
+   "category": "terrain",
+   "kb": 6
+  },
+  {
+   "id": "block-grass-large",
+   "path": "kit/platformer/block-grass-large.glb",
+   "category": "terrain",
+   "kb": 10
+  },
+  {
+   "id": "block-grass-large-slope",
+   "path": "kit/platformer/block-grass-large-slope.glb",
+   "category": "terrain",
+   "kb": 11
+  },
+  {
+   "id": "block-grass-large-slope-steep",
+   "path": "kit/platformer/block-grass-large-slope-steep.glb",
+   "category": "terrain",
+   "kb": 11
+  },
+  {
+   "id": "block-grass-large-tall",
+   "path": "kit/platformer/block-grass-large-tall.glb",
+   "category": "terrain",
+   "kb": 10
+  },
+  {
+   "id": "block-grass-long",
+   "path": "kit/platformer/block-grass-long.glb",
+   "category": "terrain",
+   "kb": 10
+  },
+  {
+   "id": "block-grass-low",
+   "path": "kit/platformer/block-grass-low.glb",
+   "category": "terrain",
+   "kb": 10
+  },
+  {
+   "id": "block-grass-narrow",
+   "path": "kit/platformer/block-grass-narrow.glb",
+   "category": "terrain",
+   "kb": 10
+  },
+  {
+   "id": "block-moving",
+   "path": "kit/platformer/block-moving.glb",
+   "category": "terrain",
+   "kb": 12
+  },
+  {
+   "id": "block-moving-large",
+   "path": "kit/platformer/block-moving-large.glb",
+   "category": "terrain",
+   "kb": 12
+  },
+  {
+   "id": "arrow",
+   "path": "kit/platformer/arrow.glb",
+   "category": "structure",
+   "kb": 7
+  },
+  {
+   "id": "arrows",
+   "path": "kit/platformer/arrows.glb",
+   "category": "structure",
+   "kb": 10
+  },
+  {
+   "id": "barrel",
+   "path": "kit/platformer/barrel.glb",
+   "category": "container",
+   "kb": 14
+  },
+  {
+   "id": "bomb",
+   "path": "kit/platformer/bomb.glb",
+   "category": "hazard",
+   "kb": 16
+  },
+  {
+   "id": "brick",
+   "path": "kit/platformer/brick.glb",
+   "category": "structure",
+   "kb": 22
+  },
+  {
+   "id": "button-round",
+   "path": "kit/platformer/button-round.glb",
+   "category": "door",
+   "kb": 12
+  },
+  {
+   "id": "button-square",
+   "path": "kit/platformer/button-square.glb",
+   "category": "door",
+   "kb": 12
+  },
+  {
+   "id": "character-oobi",
+   "path": "kit/platformer/character-oobi.glb",
+   "category": "misc",
+   "kb": 263
+  },
+  {
+   "id": "character-oodi",
+   "path": "kit/platformer/character-oodi.glb",
+   "category": "misc",
+   "kb": 230
+  },
+  {
+   "id": "character-ooli",
+   "path": "kit/platformer/character-ooli.glb",
+   "category": "misc",
+   "kb": 234
+  },
+  {
+   "id": "character-oopi",
+   "path": "kit/platformer/character-oopi.glb",
+   "category": "misc",
+   "kb": 238
+  },
+  {
+   "id": "character-oozi",
+   "path": "kit/platformer/character-oozi.glb",
+   "category": "misc",
+   "kb": 246
+  },
+  {
+   "id": "chest",
+   "path": "kit/platformer/chest.glb",
+   "category": "container",
+   "kb": 25
+  },
+  {
+   "id": "coin-bronze",
+   "path": "kit/platformer/coin-bronze.glb",
+   "category": "pickup",
+   "kb": 10
+  },
+  {
+   "id": "coin-gold",
+   "path": "kit/platformer/coin-gold.glb",
+   "category": "pickup",
+   "kb": 10
+  },
+  {
+   "id": "coin-silver",
+   "path": "kit/platformer/coin-silver.glb",
+   "category": "pickup",
+   "kb": 10
+  },
+  {
+   "id": "conveyor-belt",
+   "path": "kit/platformer/conveyor-belt.glb",
+   "category": "platform",
+   "kb": 33
+  },
+  {
+   "id": "crate",
+   "path": "kit/platformer/crate.glb",
+   "category": "container",
+   "kb": 14
+  },
+  {
+   "id": "crate-item",
+   "path": "kit/platformer/crate-item.glb",
+   "category": "container",
+   "kb": 13
+  },
+  {
+   "id": "crate-item-strong",
+   "path": "kit/platformer/crate-item-strong.glb",
+   "category": "container",
+   "kb": 37
+  },
+  {
+   "id": "crate-strong",
+   "path": "kit/platformer/crate-strong.glb",
+   "category": "container",
+   "kb": 41
+  },
+  {
+   "id": "door-large-open",
+   "path": "kit/platformer/door-large-open.glb",
+   "category": "door",
+   "kb": 17
+  },
+  {
+   "id": "door-open",
+   "path": "kit/platformer/door-open.glb",
+   "category": "door",
+   "kb": 7
+  },
+  {
+   "id": "door-rotate",
+   "path": "kit/platformer/door-rotate.glb",
+   "category": "door",
+   "kb": 37
+  },
+  {
+   "id": "door-rotate-large",
+   "path": "kit/platformer/door-rotate-large.glb",
+   "category": "door",
+   "kb": 38
+  },
+  {
+   "id": "fence-broken",
+   "path": "kit/platformer/fence-broken.glb",
+   "category": "structure",
+   "kb": 21
+  },
+  {
+   "id": "fence-corner",
+   "path": "kit/platformer/fence-corner.glb",
+   "category": "structure",
+   "kb": 10
+  },
+  {
+   "id": "fence-corner-curved",
+   "path": "kit/platformer/fence-corner-curved.glb",
+   "category": "structure",
+   "kb": 15
+  },
+  {
+   "id": "fence-low-broken",
+   "path": "kit/platformer/fence-low-broken.glb",
+   "category": "structure",
+   "kb": 10
+  },
+  {
+   "id": "fence-low-corner",
+   "path": "kit/platformer/fence-low-corner.glb",
+   "category": "structure",
+   "kb": 12
+  },
+  {
+   "id": "fence-low-corner-curved",
+   "path": "kit/platformer/fence-low-corner-curved.glb",
+   "category": "structure",
+   "kb": 21
+  },
+  {
+   "id": "fence-low-straight",
+   "path": "kit/platformer/fence-low-straight.glb",
+   "category": "structure",
+   "kb": 8
+  },
+  {
+   "id": "fence-rope",
+   "path": "kit/platformer/fence-rope.glb",
+   "category": "structure",
+   "kb": 18
+  },
+  {
+   "id": "fence-straight",
+   "path": "kit/platformer/fence-straight.glb",
+   "category": "structure",
+   "kb": 6
+  },
+  {
+   "id": "flag",
+   "path": "kit/platformer/flag.glb",
+   "category": "door",
+   "kb": 11
+  },
+  {
+   "id": "flowers",
+   "path": "kit/platformer/flowers.glb",
+   "category": "nature",
+   "kb": 25
+  },
+  {
+   "id": "flowers-tall",
+   "path": "kit/platformer/flowers-tall.glb",
+   "category": "nature",
+   "kb": 38
+  },
+  {
+   "id": "grass",
+   "path": "kit/platformer/grass.glb",
+   "category": "nature",
+   "kb": 9
+  },
+  {
+   "id": "heart",
+   "path": "kit/platformer/heart.glb",
+   "category": "pickup",
+   "kb": 6
+  },
+  {
+   "id": "hedge",
+   "path": "kit/platformer/hedge.glb",
+   "category": "nature",
+   "kb": 9
+  },
+  {
+   "id": "hedge-corner",
+   "path": "kit/platformer/hedge-corner.glb",
+   "category": "nature",
+   "kb": 11
+  },
+  {
+   "id": "jewel",
+   "path": "kit/platformer/jewel.glb",
+   "category": "pickup",
+   "kb": 3
+  },
+  {
+   "id": "key",
+   "path": "kit/platformer/key.glb",
+   "category": "pickup",
+   "kb": 13
+  },
+  {
+   "id": "ladder",
+   "path": "kit/platformer/ladder.glb",
+   "category": "platform",
+   "kb": 7
+  },
+  {
+   "id": "ladder-broken",
+   "path": "kit/platformer/ladder-broken.glb",
+   "category": "platform",
+   "kb": 11
+  },
+  {
+   "id": "ladder-long",
+   "path": "kit/platformer/ladder-long.glb",
+   "category": "platform",
+   "kb": 10
+  },
+  {
+   "id": "lever",
+   "path": "kit/platformer/lever.glb",
+   "category": "door",
+   "kb": 17
+  },
+  {
+   "id": "lock",
+   "path": "kit/platformer/lock.glb",
+   "category": "door",
+   "kb": 9
+  },
+  {
+   "id": "mushrooms",
+   "path": "kit/platformer/mushrooms.glb",
+   "category": "nature",
+   "kb": 13
+  },
+  {
+   "id": "pipe",
+   "path": "kit/platformer/pipe.glb",
+   "category": "platform",
+   "kb": 20
+  },
+  {
+   "id": "plant",
+   "path": "kit/platformer/plant.glb",
+   "category": "nature",
+   "kb": 13
+  },
+  {
+   "id": "platform",
+   "path": "kit/platformer/platform.glb",
+   "category": "platform",
+   "kb": 10
+  },
+  {
+   "id": "platform-fortified",
+   "path": "kit/platformer/platform-fortified.glb",
+   "category": "platform",
+   "kb": 12
+  },
+  {
+   "id": "platform-overhang",
+   "path": "kit/platformer/platform-overhang.glb",
+   "category": "platform",
+   "kb": 8
+  },
+  {
+   "id": "platform-ramp",
+   "path": "kit/platformer/platform-ramp.glb",
+   "category": "platform",
+   "kb": 10
+  },
+  {
+   "id": "poles",
+   "path": "kit/platformer/poles.glb",
+   "category": "platform",
+   "kb": 24
+  },
+  {
+   "id": "rocks",
+   "path": "kit/platformer/rocks.glb",
+   "category": "nature",
+   "kb": 9
+  },
+  {
+   "id": "saw",
+   "path": "kit/platformer/saw.glb",
+   "category": "hazard",
+   "kb": 14
+  },
+  {
+   "id": "sign",
+   "path": "kit/platformer/sign.glb",
+   "category": "door",
+   "kb": 9
+  },
+  {
+   "id": "spike-block",
+   "path": "kit/platformer/spike-block.glb",
+   "category": "hazard",
+   "kb": 15
+  },
+  {
+   "id": "spike-block-wide",
+   "path": "kit/platformer/spike-block-wide.glb",
+   "category": "hazard",
+   "kb": 26
+  },
+  {
+   "id": "spring",
+   "path": "kit/platformer/spring.glb",
+   "category": "platform",
+   "kb": 38
+  },
+  {
+   "id": "star",
+   "path": "kit/platformer/star.glb",
+   "category": "pickup",
+   "kb": 6
+  },
+  {
+   "id": "stones",
+   "path": "kit/platformer/stones.glb",
+   "category": "nature",
+   "kb": 13
+  },
+  {
+   "id": "trap-spikes",
+   "path": "kit/platformer/trap-spikes.glb",
+   "category": "hazard",
+   "kb": 18
+  },
+  {
+   "id": "trap-spikes-large",
+   "path": "kit/platformer/trap-spikes-large.glb",
+   "category": "hazard",
+   "kb": 26
+  },
+  {
+   "id": "tree",
+   "path": "kit/platformer/tree.glb",
+   "category": "nature",
+   "kb": 42
+  },
+  {
+   "id": "tree-pine",
+   "path": "kit/platformer/tree-pine.glb",
+   "category": "nature",
+   "kb": 22
+  },
+  {
+   "id": "tree-pine-small",
+   "path": "kit/platformer/tree-pine-small.glb",
+   "category": "nature",
+   "kb": 22
+  },
+  {
+   "id": "tree-pine-snow",
+   "path": "kit/platformer/tree-pine-snow.glb",
+   "category": "nature",
+   "kb": 22
+  },
+  {
+   "id": "tree-pine-snow-small",
+   "path": "kit/platformer/tree-pine-snow-small.glb",
+   "category": "nature",
+   "kb": 22
+  },
+  {
+   "id": "tree-snow",
+   "path": "kit/platformer/tree-snow.glb",
+   "category": "nature",
+   "kb": 42
+  }
+ ]
+}
