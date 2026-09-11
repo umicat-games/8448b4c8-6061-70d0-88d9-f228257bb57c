@@ -19,16 +19,28 @@ const SAVE_KEY = 'highScore';
 const SPAWN = { x: 0, y: 0.4, z: 1.7 };
 const RESPAWN_BELOW_Y = -5;
 
-const PLAYER_MAX_HP = 5;
+const PLAYER_MAX_HP = 6;
 const PLAYER_HALF_HEIGHT = 0.2;
 const PLAYER_RADIUS = 0.16;
 const PLAYER_SYNC_OFFSET = -(PLAYER_HALF_HEIGHT + PLAYER_RADIUS); // capsule centre -> feet
 
-const ATTACK_RANGE = 0.95;
-const ATTACK_CONE_COS = 0.4; // ~66 degrees half-angle either side of facing
-const HIT_INVINCIBLE_SECONDS = 1.0;
+// A swing is a wide swipe in front of you, not a narrow poke — a cone tight
+// enough to miss anything not dead ahead reads as "the hit didn't count" even
+// when it clearly should have, especially since facing only turns while
+// moving. Range + an omnidirectional radius (rather than a facing cone) is a
+// deliberate concession to that: it is far more forgiving than realistic.
+const ATTACK_RANGE = 1.1;
+// A hit that doesn't move anything reads as having no weight, and it leaves
+// whatever's next to you free to keep touching you every cooldown tick. Both
+// get fixed by shoving the target back and freezing its AI for a beat.
+const KNOCKBACK_DIST = 0.5;
+const HIT_STUN_SECONDS = 0.4;
+// How long the player is untouchable right after taking a hit, and right at
+// the start of a run (so getting your bearings doesn't cost a heart).
+const HIT_INVINCIBLE_SECONDS = 1.6;
+const START_INVINCIBLE_SECONDS = 2.0;
 const CONTACT_RANGE = 0.55;
-const CONTACT_COOLDOWN_SECONDS = 1.0;
+const CONTACT_COOLDOWN_SECONDS = 1.4;
 
 // Every critter shares a capsule sized for the kit's blob characters (they
 // stand a bit taller than the hero's own capsule).
@@ -46,16 +58,23 @@ interface EnemyDef {
   detectRadius: number;
   speed: number;
   hp: number;
+  /** Seconds since the run started before this one wakes up and starts
+   *  chasing. Without this every enemy in detect range converges on the
+   *  player in the opening seconds, before they've even found the controls —
+   *  staggering it means at most one or two are ever a threat at once early
+   *  on, and the rest show up as the fight goes on rather than all at once. */
+  activateAt: number;
 }
 
 const ENEMY_DEFS: EnemyDef[] = [
-  { id: 'enemy_oobi', modelAssetId: 'enemy-oobi', spawn: { x: -2.0, y: 0.5, z: -0.5 }, leash: 3.2, detectRadius: 3.4, speed: 1.1, hp: 2 },
-  { id: 'enemy_oodi', modelAssetId: 'enemy-oodi', spawn: { x: 2.0, y: 0.5, z: 2.6 }, leash: 3.2, detectRadius: 3.4, speed: 1.1, hp: 2 },
-  { id: 'enemy_ooli', modelAssetId: 'enemy-ooli', spawn: { x: -3.6, y: 0.5, z: 3.6 }, leash: 3.2, detectRadius: 3.4, speed: 1.15, hp: 2 },
-  { id: 'enemy_oopi', modelAssetId: 'enemy-oopi', spawn: { x: 0.0, y: 0.5, z: -4.6 }, leash: 3.2, detectRadius: 3.4, speed: 1.15, hp: 2 },
+  { id: 'enemy_oobi', modelAssetId: 'enemy-oobi', spawn: { x: -2.0, y: 0.5, z: -0.5 }, leash: 3.2, detectRadius: 2.6, speed: 0.85, hp: 2, activateAt: 0 },
+  { id: 'enemy_oodi', modelAssetId: 'enemy-oodi', spawn: { x: 2.0, y: 0.5, z: 2.6 }, leash: 3.2, detectRadius: 2.6, speed: 0.85, hp: 2, activateAt: 8 },
+  { id: 'enemy_ooli', modelAssetId: 'enemy-ooli', spawn: { x: -3.6, y: 0.5, z: 3.6 }, leash: 3.2, detectRadius: 2.6, speed: 0.85, hp: 2, activateAt: 16 },
+  { id: 'enemy_oopi', modelAssetId: 'enemy-oopi', spawn: { x: 0.0, y: 0.5, z: -4.6 }, leash: 3.2, detectRadius: 2.6, speed: 0.85, hp: 2, activateAt: 24 },
   // Stationed on the top platform — its leash is short enough that it never
-  // wanders off the edge; the player has to climb up to reach it.
-  { id: 'enemy_oozi', modelAssetId: 'enemy-oozi', spawn: { x: 5.4, y: 1.75, z: -3.0 }, leash: 0.35, detectRadius: 3.4, speed: 1.0, hp: 2 },
+  // wanders off the edge; the player has to climb up to reach it. Reaching it
+  // at all is already gated by the platform course, so it wakes up immediately.
+  { id: 'enemy_oozi', modelAssetId: 'enemy-oozi', spawn: { x: 5.4, y: 1.75, z: -3.0 }, leash: 0.35, detectRadius: 3.4, speed: 0.8, hp: 2, activateAt: 0 },
 ];
 
 interface EnemyRuntime {
@@ -67,6 +86,7 @@ interface EnemyRuntime {
   dying: boolean;
   hp: number;
   hitCooldown: number; // seconds until this enemy can deal contact damage again
+  hitStun: number; // seconds left frozen + knocked back after being hit
   dieTimer: number;
 }
 
@@ -126,7 +146,7 @@ async function start(): Promise<void> {
     const enemyAnimator = mixer ? new CharacterAnimator(mixer, clips, enemyClipMap) : null;
     return {
       def, controller, mesh, animator: enemyAnimator,
-      alive: true, dying: false, hp: def.hp, hitCooldown: 0, dieTimer: 0,
+      alive: true, dying: false, hp: def.hp, hitCooldown: 0, hitStun: 0, dieTimer: 0,
     };
   });
   const totalEnemies = enemies.length;
@@ -238,21 +258,19 @@ async function start(): Promise<void> {
   // Saving high scores is cheap and only on the score, so no coalescing needed
   // here — writes only happen once, at the end of a run (see endRun).
 
-  const forward = new THREE.Vector3();
   const toEnemy = new THREE.Vector3();
 
   const tryAttack = (): void => {
     if (gameOver || !animator || animator.busy) return;
     animator.play('attack');
-    hero.getWorldDirection(forward);
     for (const enemy of enemies) {
       if (!enemy.alive || enemy.dying) continue;
       toEnemy.set(enemy.mesh.position.x - hero.position.x, 0, enemy.mesh.position.z - hero.position.z);
       const dist = toEnemy.length();
-      if (dist > ATTACK_RANGE || dist < 0.0001) continue;
-      toEnemy.normalize();
-      const facing = forward.x * toEnemy.x + forward.z * toEnemy.z;
-      if (facing < ATTACK_CONE_COS) continue;
+      // A wide swipe around the player, not a narrow cone in front — facing
+      // only turns while moving, so requiring the player to be squared up
+      // made a clean hit whiff constantly. Range alone is far more forgiving.
+      if (dist > ATTACK_RANGE) continue;
       // Also require the enemy to actually be near our height (don't hit the
       // guard on the platform while standing on the ground below it).
       if (Math.abs(enemy.mesh.position.y - hero.position.y) > 0.7) continue;
@@ -260,7 +278,25 @@ async function start(): Promise<void> {
       if (enemy.hp <= 0) {
         enemy.dying = true;
         enemy.animator?.play('die', { interrupt: true });
+        continue;
       }
+      // A hit that survives: shove it back and stun it for a beat, so
+      // landing a swing actually buys the player some breathing room instead
+      // of the critter just standing there taking the next tick of contact
+      // damage a moment later.
+      const pushDist = dist > 0.0001 ? 1 / dist : 0;
+      let kx = enemy.mesh.position.x + toEnemy.x * pushDist * KNOCKBACK_DIST;
+      let kz = enemy.mesh.position.z + toEnemy.z * pushDist * KNOCKBACK_DIST;
+      const fromSpawnX = kx - enemy.def.spawn.x;
+      const fromSpawnZ = kz - enemy.def.spawn.z;
+      const fromSpawnDist = Math.hypot(fromSpawnX, fromSpawnZ);
+      if (fromSpawnDist > enemy.def.leash && fromSpawnDist > 0.0001) {
+        const scale = enemy.def.leash / fromSpawnDist;
+        kx = enemy.def.spawn.x + fromSpawnX * scale;
+        kz = enemy.def.spawn.z + fromSpawnZ * scale;
+      }
+      enemy.controller.teleport({ x: kx, y: enemy.controller.position.y, z: kz });
+      enemy.hitStun = HIT_STUN_SECONDS;
     }
   };
 
@@ -269,7 +305,10 @@ async function start(): Promise<void> {
   // three.js deprecated Clock, and setAnimationLoop already hands us the
   // timestamp, so there is nothing to replace it with.
   let attackWasDown = false;
-  let invincibleLeft = 0;
+  // Untouchable for a couple of seconds at the start of the run — enough to
+  // get oriented before anything can land a hit.
+  let invincibleLeft = START_INVINCIBLE_SECONDS;
+  let runTime = 0;
   const enemyDir = { x: 0, z: 0 };
   const enemySpawnOffset = new THREE.Vector3();
 
@@ -281,6 +320,7 @@ async function start(): Promise<void> {
     last = now;
 
     if (!gameOver) {
+      runTime += dt;
       const dir = input.direction();
       character.update(dt, dir, { jump: input.jump });
 
@@ -314,13 +354,19 @@ async function start(): Promise<void> {
           continue;
         }
 
+        if (enemy.hitStun > 0) enemy.hitStun -= dt;
+        if (enemy.hitCooldown > 0) enemy.hitCooldown -= dt;
+
         const pos = enemy.controller.position;
         const dx = hero.position.x - pos.x;
         const dz = hero.position.z - pos.z;
         const distToPlayer = Math.hypot(dx, dz);
 
+        // Frozen for a beat after being hit, or hasn't woken up yet — either
+        // way, no chasing this frame.
+        const canChase = enemy.hitStun <= 0 && runTime >= enemy.def.activateAt;
         enemyDir.x = 0; enemyDir.z = 0;
-        if (distToPlayer < enemy.def.detectRadius && distToPlayer > 0.001) {
+        if (canChase && distToPlayer < enemy.def.detectRadius && distToPlayer > 0.001) {
           const nx = dx / distToPlayer;
           const nz = dz / distToPlayer;
           // Leash: don't move further from spawn than allowed.
@@ -334,13 +380,13 @@ async function start(): Promise<void> {
         enemy.controller.faceTowards(enemy.mesh, enemyDir, dt);
         enemy.animator?.update(enemy.controller.state === 'walk' ? 'walk' : 'idle');
 
-        if (enemy.hitCooldown > 0) enemy.hitCooldown -= dt;
-
         // Contact damage — full 3D distance so the platform guard can't
-        // reach a player still standing on the ground below it.
+        // reach a player still standing on the ground below it. Suppressed
+        // during hitstun too, since a freshly-knocked-back critter shouldn't
+        // be able to trade a hit back before it's recovered.
         const dy = enemy.mesh.position.y - hero.position.y;
         const dist3d = Math.hypot(dx, dy, dz);
-        if (dist3d < CONTACT_RANGE && enemy.hitCooldown <= 0 && invincibleLeft <= 0) {
+        if (enemy.hitStun <= 0 && dist3d < CONTACT_RANGE && enemy.hitCooldown <= 0 && invincibleLeft <= 0) {
           enemy.hitCooldown = CONTACT_COOLDOWN_SECONDS;
           invincibleLeft = HIT_INVINCIBLE_SECONDS;
           playerHP -= 1;

@@ -5,7 +5,49 @@ clearing, melee combat, a jump-platform course that gates one critter behind
 actually climbing. Win by clearing every critter; lose by running out of
 hearts; retry is instant. See `docs/design.md` for the full design intent.
 
-## Current implementation (this turn)
+## Balance (this turn — rebalanced after a real playtest)
+
+A playtest reported: dead in 5 seconds standing still, 2 critters on top of
+the player within 3 seconds of spawning, 0 kills in 2 seconds even while
+actively fighting back. Root causes and the fix, in `src/main.ts`:
+
+- **All 5 detected and converged at once** (`detectRadius` was 3.4, nearly
+  arena-wide) **and nothing gated who could act when.** Fix: `EnemyDef` now
+  has `activateAt` (seconds since run start) — `enemy_oobi`/`enemy_oozi` are
+  live from t=0, `enemy_oodi`/`enemy_ooli`/`enemy_oopi` wake at t=8/16/24.
+  At most one ground critter is ever a threat in the opening seconds.
+  `detectRadius` dropped 3.4 → 2.6 as a second line of defence.
+- **A hit landed with no consequence** — no knockback, no stun — so a
+  critter that reached the player just stood there and re-triggered contact
+  damage every cooldown tick. Fix: a non-lethal hit now teleports the
+  critter back `KNOCKBACK_DIST` (clamped to its leash, so the platform guard
+  can't be knocked off its platform) and freezes its AI for `HIT_STUN_SECONDS`
+  — no chasing, no contact damage, while stunned.
+- **The 66°-half-angle facing cone required turning to hit anything not
+  directly ahead, but facing only updates while moving** — so a swing that
+  visually connected often didn't count. Fix: dropped the cone entirely;
+  `tryAttack()` is now a plain omnidirectional radius check (`ATTACK_RANGE`
+  0.95 → 1.1). Deliberately generous — this is a forgiving arena brawler, not
+  a precision fighter.
+- **Damage could stack near-instantly**: `HIT_INVINCIBLE_SECONDS` 1.0 → 1.6,
+  `CONTACT_COOLDOWN_SECONDS` 1.0 → 1.4, `PLAYER_MAX_HP` 5 → 6, plus a new
+  `START_INVINCIBLE_SECONDS` (2s untouchable at run start, before anyone
+  could realistically have landed a hit anyway) so the player isn't at risk
+  before they've even gotten their bearings. Enemy `speed` 1.0–1.15 → a
+  uniform 0.8–0.85, well under the player's 1.9, so kiting is always viable.
+
+**Verified with a standalone re-simulation of the same formulas** (not the
+real per-frame code, but the same distances/timers/cooldowns — see the
+numbers below), not just by inspection:
+- *Stand completely still, never act:* first hit at t≈9.9s (was ~0s), dead
+  at t≈18s (was ~5s) — inaction is still eventually punished, just not
+  instantly.
+- *An "always walk to the nearest active critter and attack on cooldown"
+  bot:* clears all 5 in ~28s with 0 damage taken. Real, imperfect play will
+  cost some hearts (the sim doesn't model the platform climb or missed
+  inputs), but the ceiling is now "beatable," not "impossible."
+
+## Current implementation
 
 - **Manifest** (`public/scenes3d/manifest.json`): added `platform-fortified`,
   and five enemy model ids (`enemy-oobi/oodi/ooli/oopi/oozi`, each pointing at
@@ -33,11 +75,12 @@ hearts; retry is instant. See `docs/design.md` for the full design intent.
     direction to zero once exceeded. The platform guard (`enemy_oozi`) has a
     leash of `0.35`, short enough it never nears the platform's edge, so
     reaching it requires the player to actually climb the platform course.
-  - Combat: `tryAttack()` does a cone check (dot product against
-    `hero.getWorldDirection()`) within `ATTACK_RANGE`, plus a vertical
-    guard so you can't hit the platform guard from the ground below it.
-    Contact damage uses full 3D distance for the same reason, with a
-    per-enemy cooldown and a global player invincibility window so one
+  - Combat: `tryAttack()` is an omnidirectional radius check (`ATTACK_RANGE`,
+    no facing cone — see the Balance section below for why), plus a vertical
+    guard so you can't hit the platform guard from the ground below it. A
+    non-lethal hit knocks the critter back and stuns it (`HIT_STUN_SECONDS`).
+    Contact damage uses full 3D distance for the same vertical-guard reason,
+    with a per-enemy cooldown and a global player invincibility window so one
     stumble doesn't chain-hit.
   - HUD: heart row + kill counter + best-score line as `#hud` children
     (never `hud.textContent =`), a win/lose overlay with a Play Again button
