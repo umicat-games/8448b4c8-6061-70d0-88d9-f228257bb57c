@@ -30,6 +30,21 @@
         "kick": "attack-kick-right",
         "yes": "emote-yes",
         "no": "emote-no"
+      },
+      "sockets": {
+        "hand-right": {
+          "bone": "arm-right",
+          "position": {
+            "x": -0.25,
+            "y": 0.0,
+            "z": 0.03
+          },
+          "rotation": {
+            "x": 0.785,
+            "y": 0.0,
+            "z": -0.262
+          }
+        }
       }
     },
     {
@@ -141,6 +156,11 @@
         "die": "die",
         "attack": "attack-melee-right"
       }
+    },
+    {
+      "id": "sword",
+      "path": "kit/weapons/weapon-sword.glb",
+      "importScale": 1
     }
   ]
 }

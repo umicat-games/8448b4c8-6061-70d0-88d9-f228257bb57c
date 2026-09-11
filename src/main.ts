@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
-  ThreeUmicat, loadScene3D, CharacterController3D, CharacterAnimator, Input3D,
+  ThreeUmicat, loadScene3D, loadModelAsset, attachToSocket,
+  CharacterController3D, CharacterAnimator, Input3D,
   type Scene3D, type Manifest3D, type LoadedScene3D,
 } from '@umicat/three-sdk';
 import { GAME_WIDTH, GAME_HEIGHT } from './config';
@@ -128,6 +129,20 @@ async function start(): Promise<void> {
   const animator = heroMixer
     ? new CharacterAnimator(heroMixer, world.clips.get('hero') ?? [], clipMap)
     : null;
+
+  // --- The sword. It hangs off a BONE, so it swings when the arm does; a
+  // weapon parented to the model root hovers politely beside a character
+  // doing all the work. The socket offset lives in the manifest next to the
+  // character, because it is a property of that rig -- which has no hand bone
+  // at all (root, two legs, torso, two arms, head), so "the hand" is a tuned
+  // point along the arm. ---
+  const heroAsset = manifest.models?.find((m) => m.id === 'hero');
+  const handRight = heroAsset?.sockets?.['hand-right'];
+  if (handRight) {
+    const { object: sword } = await loadModelAsset(manifest, 'sword', { assetBase: '' });
+    sword.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = true; });
+    attachToSocket(hero, handRight, sword);
+  }
 
   // Enemies: one CharacterController3D each, driven by a tiny chase-with-a-
   // leash AI rather than input. Same controller the player uses, so they get
