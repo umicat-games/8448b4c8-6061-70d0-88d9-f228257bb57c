@@ -19,6 +19,16 @@ import { GAME_WIDTH, GAME_HEIGHT } from './config';
 
 const SAVE_KEY = 'progress';
 
+// The crystals scattered around the arena (see public/scenes3d/main.json) — a
+// short, complete collect-a-thon: grab all of them and the round is cleared.
+// Not persisted: which crystals are left is current-run state, like the
+// player's position mid-level, and resets on reload same as a fresh round would.
+const CRYSTAL_IDS = [
+  'crystal_g1', 'crystal_g2', 'crystal_g3', 'crystal_g4', 'crystal_g5',
+  'crystal_low', 'crystal_mid', 'crystal_tall',
+];
+const PICKUP_RADIUS = 1.0;
+
 async function start(): Promise<void> {
   // 1) The platform. Do this first: reading the save before the first frame is
   //    what makes a reload resume instead of restart.
@@ -60,7 +70,35 @@ async function start(): Promise<void> {
   resize();
   window.addEventListener('resize', resize);
 
-  hud.textContent = umicat.user ? `Hello, ${umicat.user.name}` : 'Playing as a guest';
+  const greetingEl = document.createElement('div');
+  greetingEl.id = 'greeting';
+  greetingEl.textContent = umicat.user ? `Hello, ${umicat.user.name}` : 'Playing as a guest';
+  const scoreEl = document.createElement('div');
+  scoreEl.id = 'score';
+  hud.append(greetingEl, scoreEl);
+
+  // Crystals: entities with no collider (decoration) — picked up by proximity,
+  // not physics. Filter out any id missing from the scene so a future edit to
+  // main.json can't silently crash the loop.
+  const crystals = CRYSTAL_IDS
+    .map((id) => world.entities.get(id))
+    .filter((obj): obj is THREE.Object3D => obj !== undefined);
+  const collected = new Set<THREE.Object3D>();
+  const crystalWorldPos = new THREE.Vector3();
+  const total = crystals.length;
+
+  const renderScore = (bump: boolean): void => {
+    const cleared = collected.size >= total;
+    scoreEl.textContent = cleared ? `Crystals: ${total}/${total} — Cleared!` : `Crystals: ${collected.size}/${total}`;
+    scoreEl.classList.toggle('cleared', cleared);
+    if (bump) {
+      scoreEl.classList.remove('bump');
+      // Force reflow so re-adding the class retriggers the transition.
+      void scoreEl.offsetWidth;
+      scoreEl.classList.add('bump');
+    }
+  };
+  renderScore(false);
 
   // Saving every frame would hammer the host; coalesce instead.
   let pending: ReturnType<typeof setTimeout> | undefined;
@@ -81,6 +119,22 @@ async function start(): Promise<void> {
     character.syncTo(hero, -0.85);          // capsule centre → the model's feet
     character.faceTowards(hero, dir, dt);
     if (Math.hypot(dir.x, dir.z) > 0) save();
+
+    if (collected.size < total) {
+      const p = character.position;
+      for (const crystal of crystals) {
+        if (collected.has(crystal)) continue;
+        crystal.getWorldPosition(crystalWorldPos);
+        const dx = crystalWorldPos.x - p.x;
+        const dy = crystalWorldPos.y - p.y;
+        const dz = crystalWorldPos.z - p.z;
+        if (dx * dx + dy * dy + dz * dz <= PICKUP_RADIUS * PICKUP_RADIUS) {
+          collected.add(crystal);
+          crystal.visible = false;
+          renderScore(true);
+        }
+      }
+    }
 
     world.update(dt);                        // animation + physics + follow camera
     renderer.render(world.scene, world.camera);

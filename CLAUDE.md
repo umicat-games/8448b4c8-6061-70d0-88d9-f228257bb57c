@@ -2,6 +2,32 @@
 
 A three.js game on the Umicat platform. This file is what the agent reads first.
 
+## This game: Fox Crystal Hunt
+
+A short collect-a-thon. The fox (`hero`) walks around an arena with three
+staircased platforms (low/mid/tall — each tier is a stacked box with a
+≤0.4m rise so `CharacterController3D`'s autostep climbs it without a jump,
+since this game has none) and a few purely-decorative obstacles (`rock_1`,
+`rock_2`, `crate_2`, plus the original `crate`, all off the paths to any
+crystal).
+
+8 crystal entities (`crystal_g1`..`g5` on the ground, `crystal_low`,
+`crystal_mid`, `crystal_tall` on top of the three platforms) are plain
+primitive entities with **no collider** — they're decoration, not physics
+objects. `src/main.ts` picks them up itself: every frame it 3D-distance-checks
+the character's position against each uncollected crystal
+(`PICKUP_RADIUS = 1.0`), and on a hit sets `.visible = false`, adds it to a
+`collected` Set, and re-renders the HUD score line. See `docs/design.md` /
+`docs/decisions.md` for the design intent behind the numbers.
+
+The score/win state lives in a dedicated `#score` DOM element (built
+alongside the existing `#greeting` line in `main.ts`, styled in
+`index.html`): "Crystals: n/8" while playing, and the same element's text
+switches to "Crystals: 8/8 — Cleared!" once the last one is picked up — no
+popup. Collected-crystal state is intentionally NOT saved (`umicat.saves`)
+— it's current-run state like the player's position mid-round, not
+progress meant to survive a reload.
+
 ## Where things are
 
 | | |
