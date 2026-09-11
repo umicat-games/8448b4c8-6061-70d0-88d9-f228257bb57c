@@ -1,83 +1,74 @@
 # Woodland Brawl
 
-A cheerful, chunky forest brawler for two players sharing one keyboard.
+A cheerful, chunky action arena for one player.
 
 ## Concept
 
-Two heroes stand in a sunny forest clearing. Waves of critters shuffle out of
-the treeline and close in — the players smack them down together with melee
-swings before they're overrun. Clear a wave, catch your breath for a moment,
-then the next (bigger) wave comes. Simple, readable, couch-friendly chaos.
+A lone hero stands in a sunny forest clearing ringed by trees, rocks and a
+raised lookout. A handful of critters roam the glade — clear every one of
+them with melee swings to win the round. Get chipped down to nothing first
+and it's game over, with an instant retry.
 
 ## Core loop
 
-1. A wave of critters spawns at the edge of the clearing and shambles toward
-   the players.
-2. Players move and swing to knock critters out; each takes a couple of hits.
-3. Defeated critters drop a coin or a heart.
-4. Once the wave is cleared, a short breather, then the next wave starts —
-   more critters, a little faster.
-5. If a critter reaches a player, it chips their health. Losing all health
-   knocks that player down; when both are down, the run ends.
-6. Score (critters cleared) is compared against a shared best run.
-
-There's no separate "win" screen — it's an endless survive-as-long-as-you-can
-loop, scored by how many waves you clear together.
+1. The round starts with a fixed roster of critters scattered around the
+   clearing (one is stationed up on a raised platform, reachable only by
+   climbing a short chain of jump platforms).
+2. The player moves around, swings to knock critters down (each takes a
+   couple of hits), and avoids their touch.
+3. Getting bumped by a critter costs a heart, with a brief breather
+   afterward so one clumsy moment doesn't chain into three.
+4. Clearing every critter wins the round. Losing all hearts ends it.
+5. Either way, a retry is one tap away, and the best "critters cleared"
+   result is remembered as a house record.
 
 ## Design pillars
 
-- **Read at a glance.** Bright grass, clear player-vs-critter silhouettes, a
-  wide fixed camera that always shows the whole clearing — never a fight you
-  can't see coming.
-- **Couch-friendly.** Built for two people, one keyboard, sitting side by
-  side. No menus to fumble through mid-fight.
-- **Cheerful, not grim.** Critters are goofy and bouncy, not scary. Getting
-  hit is a stumble, not gore. Defeats are a satisfying little pop.
-- **Escalation, not punishment.** Waves ramp gradually. The tension is "can
-  we keep this up," not "one mistake and it's over."
+- **Read at a glance.** Bright grass, clear hero-vs-critter silhouettes, a
+  third-person camera pulled back enough to see trouble coming.
+- **A real place, not a checklist.** The clearing is dressed with real props
+  — trees, rocks, crates, a spring, a little jump course — so it reads as a
+  place, not a arena made of placeholder boxes.
+- **Jumping matters.** At least one critter is placed somewhere you can only
+  reach by climbing — the platforms aren't just scenery.
+- **Cheerful, not grim.** Critters are goofy little characters, not
+  monsters. A hit is a stumble and a pop, not gore.
 
-## Players & controls
+## Controls
 
-Both heroes look the same but are tagged with a small colored marker (e.g. a
-floating ring) over their heads — blue for Player 1, orange for Player 2 — so
-it's always clear who's who on screen.
-
-- **Player 1:** WASD to move, Space to jump, F to swing.
-- **Player 2:** Arrow keys to move, Right Shift to jump, Right Ctrl to swing.
+- Move: keyboard direction keys / on-screen thumbstick on a phone.
+- Jump: Space / the on-screen jump button.
+- Swing: J / the on-screen sword button (built for touch since there's no
+  physical key on a phone).
 
 ## Systems
 
-- **Health:** each player has a small number of hearts. Contact with a
-  critter costs one heart, with a brief invincible flinch afterward so damage
-  can't stack instantly. Zero hearts knocks that player down (they can be
-  revived by their partner clearing the current wave, keeping co-op play
-  going instead of ending the run on one mistake).
-- **Waves:** a wave is a count of critters and a spawn pace. Both increase
-  gradually as waves clear, so the game gets harder without a hard difficulty
-  cliff.
-- **Critters:** simple forest creatures that walk toward the nearest player
-  and bump them. They take a small number of hits to defeat and react
-  visibly when struck (a knockback/squash), so hits feel like they land.
-  A defeated critter leaves behind a coin (score) or occasionally a heart
-  (a little healing back for whoever picks it up).
-- **Scoring:** critters cleared (and waves survived) add up to a run score.
-  The best combined score is remembered between sessions as a shared house
-  record for the couch.
+- **Health:** a handful of hearts, shown top-left. Contact with a critter
+  costs one, with a short invincibility window right after so damage can't
+  stack from a single stumble.
+- **Critters:** each roams a home patch of the clearing and gives chase
+  once the player gets close, but won't wander far from where it's posted —
+  the one on the high platform stays put rather than diving off the edge,
+  which is what makes climbing up to it necessary rather than optional.
+  A few solid hits knock one out.
+- **Win / lose:** clear every critter to win; run out of hearts to lose.
+  Either way a retry is immediate — no punishing restart ritual.
+- **Scoring:** critters cleared this run vs. the best run so far, kept
+  between sessions as a personal best.
 
 ## Feel
 
-- Forest clearing bathed in warm daylight, ringed by trees and rocks so the
-  play space reads as an "arena" without walls looking artificial.
-- A hit lands with a snap of camera nudge and a knockback pop, not just a
-  number disappearing.
-- Getting knocked down is a stumble-and-sit animation beat, not a fail state
-  — it should feel recoverable, because it is.
+- A hit lands with a visible reaction from the critter and a quick red
+  flash at the screen edge when the player takes one back — cheap, instant
+  feedback with no extra art.
+- Climbing the platform course should feel like a small side-objective,
+  not an obstacle course — a couple of confident jumps, not a precision
+  test.
 
 ## Art & audio direction
 
-- Low-poly / chunky nature props (trees, rocks, flowers) already fit the
-  scaffold's kit — lean into that "toy diorama" look rather than realism.
-- Critters are small, round, bouncy silhouettes — friendly-looking even as
-  the antagonist.
-- Light, upbeat game feel: a satisfying "thwack" on hits, a cheerful pop on
-  defeat, a small fanfare on clearing a wave.
+- Low-poly / chunky nature props already fit the "toy diorama" look —
+  lean into that rather than realism.
+- Critters are small, round, bouncy silhouettes — mischievous, not scary.
+- Light, upbeat game feel: a satisfying thwack on a hit, a cheerful pop on
+  a knockout.

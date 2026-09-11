@@ -1,6 +1,50 @@
-# Umicat 3D game
+# Woodland Brawl
 
-A three.js game on the Umicat platform. This file is what the agent reads first.
+A single-player action arena. One hero, five kit critters roaming a forest
+clearing, melee combat, a jump-platform course that gates one critter behind
+actually climbing. Win by clearing every critter; lose by running out of
+hearts; retry is instant. See `docs/design.md` for the full design intent.
+
+## Current implementation (this turn)
+
+- **Manifest** (`public/scenes3d/manifest.json`): added `platform-fortified`,
+  and five enemy model ids (`enemy-oobi/oodi/ooli/oopi/oozi`, each pointing at
+  a distinct `kit/platformer/character-*.glb`) with an animation map of
+  `idle`/`walk`/`die`/`attack` (`attack-melee-right`) — verified these clip
+  names exist on all five models before mapping them (never guessed).
+- **Scene** (`public/scenes3d/main.json`): added a 3-step floating platform
+  course (`step_low` → `step_mid` → `step_top`, using `platform` /
+  `platform-fortified`, each with a box collider sized from the model's real
+  bounding box) leading to `enemy_oozi`, posted on `step_top`. Four more
+  enemy entities scattered around the clearing at ground level. Added fog and
+  widened/raised the follow camera offset so incoming critters are visible.
+  No collider is authored on enemy/hero entities in the scene — their
+  physics bodies are built in code via `CharacterController3D`, matching the
+  existing `hero` pattern.
+- **Game logic** (`src/main.ts`):
+  - Player: unchanged control scheme (WASD move, Space jump, J attack) plus
+    an on-screen sword button (`#hud`-adjacent, mounted to `<body>`) so the
+    swing works on touch — `Input3D` only covers move/jump on phones, not a
+    game-specific action.
+  - Enemies: one `CharacterController3D` + `CharacterAnimator` per critter
+    (same classes the player uses), driven by a small chase-with-a-leash AI
+    in the frame loop — moves toward the player when within `detectRadius`,
+    but a per-enemy `leash` distance from its spawn point clamps the
+    direction to zero once exceeded. The platform guard (`enemy_oozi`) has a
+    leash of `0.35`, short enough it never nears the platform's edge, so
+    reaching it requires the player to actually climb the platform course.
+  - Combat: `tryAttack()` does a cone check (dot product against
+    `hero.getWorldDirection()`) within `ATTACK_RANGE`, plus a vertical
+    guard so you can't hit the platform guard from the ground below it.
+    Contact damage uses full 3D distance for the same reason, with a
+    per-enemy cooldown and a global player invincibility window so one
+    stumble doesn't chain-hit.
+  - HUD: heart row + kill counter + best-score line as `#hud` children
+    (never `hud.textContent =`), a win/lose overlay with a Play Again button
+    (`location.reload()` — simplest reliable reset for a Rapier world), and a
+    red edge-flash on taking a hit for free feedback.
+  - Save: `umicat.saves` key `highScore` — critters cleared in the best run,
+    written once at the end of a run (not every frame).
 
 ## Where things are
 

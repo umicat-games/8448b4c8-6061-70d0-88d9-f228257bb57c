@@ -78,9 +78,69 @@
       "importScale": 1
     },
     {
+      "id": "platform-fortified",
+      "path": "kit/platformer/platform-fortified.glb",
+      "importScale": 1
+    },
+    {
       "id": "spring",
       "path": "kit/platformer/spring.glb",
       "importScale": 1
+    },
+    {
+      "id": "enemy-oobi",
+      "path": "kit/platformer/character-oobi.glb",
+      "importScale": 1,
+      "animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "die": "die",
+        "attack": "attack-melee-right"
+      }
+    },
+    {
+      "id": "enemy-oodi",
+      "path": "kit/platformer/character-oodi.glb",
+      "importScale": 1,
+      "animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "die": "die",
+        "attack": "attack-melee-right"
+      }
+    },
+    {
+      "id": "enemy-ooli",
+      "path": "kit/platformer/character-ooli.glb",
+      "importScale": 1,
+      "animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "die": "die",
+        "attack": "attack-melee-right"
+      }
+    },
+    {
+      "id": "enemy-oopi",
+      "path": "kit/platformer/character-oopi.glb",
+      "importScale": 1,
+      "animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "die": "die",
+        "attack": "attack-melee-right"
+      }
+    },
+    {
+      "id": "enemy-oozi",
+      "path": "kit/platformer/character-oozi.glb",
+      "importScale": 1,
+      "animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "die": "die",
+        "attack": "attack-melee-right"
+      }
     }
   ]
 }

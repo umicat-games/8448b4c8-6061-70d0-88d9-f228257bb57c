@@ -3,7 +3,12 @@
   "id": "main",
   "name": "Main",
   "environment": {
-    "background": "#8fc9e8"
+    "background": "#8fc9e8",
+    "fog": {
+      "color": "#aee0f5",
+      "near": 8,
+      "far": 20
+    }
   },
   "gravity": {
     "x": 0.0,
@@ -386,6 +391,170 @@
       }
     },
     {
+      "id": "step_low",
+      "name": "step_low",
+      "modelAssetId": "platform",
+      "transform": {
+        "position": {
+          "x": 4.2,
+          "y": 0.3,
+          "z": -4.8
+        }
+      },
+      "collider": {
+        "shape": {
+          "kind": "box",
+          "halfExtents": {
+            "x": 0.5,
+            "y": 0.0975,
+            "z": 0.5
+          }
+        },
+        "body": "fixed",
+        "offset": {
+          "x": 0,
+          "y": 0.0975,
+          "z": 0
+        }
+      }
+    },
+    {
+      "id": "step_mid",
+      "name": "step_mid",
+      "modelAssetId": "platform",
+      "transform": {
+        "position": {
+          "x": 4.9,
+          "y": 0.7,
+          "z": -3.9
+        }
+      },
+      "collider": {
+        "shape": {
+          "kind": "box",
+          "halfExtents": {
+            "x": 0.5,
+            "y": 0.0975,
+            "z": 0.5
+          }
+        },
+        "body": "fixed",
+        "offset": {
+          "x": 0,
+          "y": 0.0975,
+          "z": 0
+        }
+      }
+    },
+    {
+      "id": "step_top",
+      "name": "step_top",
+      "modelAssetId": "platform-fortified",
+      "transform": {
+        "position": {
+          "x": 5.4,
+          "y": 1.1,
+          "z": -3.0
+        }
+      },
+      "collider": {
+        "shape": {
+          "kind": "box",
+          "halfExtents": {
+            "x": 0.5,
+            "y": 0.1025,
+            "z": 0.5
+          }
+        },
+        "body": "fixed",
+        "offset": {
+          "x": 0,
+          "y": 0.1025,
+          "z": 0
+        }
+      }
+    },
+    {
+      "id": "enemy_oobi",
+      "name": "enemy_oobi",
+      "modelAssetId": "enemy-oobi",
+      "transform": {
+        "position": {
+          "x": -2.0,
+          "y": 0.0,
+          "z": -0.5
+        }
+      },
+      "animation": {
+        "play": "idle",
+        "loop": true
+      }
+    },
+    {
+      "id": "enemy_oodi",
+      "name": "enemy_oodi",
+      "modelAssetId": "enemy-oodi",
+      "transform": {
+        "position": {
+          "x": 2.0,
+          "y": 0.0,
+          "z": 2.6
+        }
+      },
+      "animation": {
+        "play": "idle",
+        "loop": true
+      }
+    },
+    {
+      "id": "enemy_ooli",
+      "name": "enemy_ooli",
+      "modelAssetId": "enemy-ooli",
+      "transform": {
+        "position": {
+          "x": -3.6,
+          "y": 0.0,
+          "z": 3.6
+        }
+      },
+      "animation": {
+        "play": "idle",
+        "loop": true
+      }
+    },
+    {
+      "id": "enemy_oopi",
+      "name": "enemy_oopi",
+      "modelAssetId": "enemy-oopi",
+      "transform": {
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": -4.6
+        }
+      },
+      "animation": {
+        "play": "idle",
+        "loop": true
+      }
+    },
+    {
+      "id": "enemy_oozi",
+      "name": "enemy_oozi",
+      "modelAssetId": "enemy-oozi",
+      "transform": {
+        "position": {
+          "x": 5.4,
+          "y": 1.2,
+          "z": -3.0
+        }
+      },
+      "animation": {
+        "play": "idle",
+        "loop": true
+      }
+    },
+    {
       "id": "hero",
       "modelAssetId": "hero",
       "name": "hero",
@@ -407,9 +576,9 @@
     "target": "hero",
     "offset": {
       "x": 0.0,
-      "y": 1.105,
-      "z": 2.3375
+      "y": 1.9,
+      "z": 3.4
     },
-    "fov": 55
+    "fov": 58
   }
 }
