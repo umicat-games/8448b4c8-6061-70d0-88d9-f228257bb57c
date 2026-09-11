@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
-  ThreeUmicat, loadScene3D, loadModelAsset, attachToSocket,
+  ThreeUmicat, loadScene3D, loadModelAsset, attachToSocket, flashTint, updateTints,
   CharacterController3D, CharacterAnimator, Input3D,
   type Scene3D, type Manifest3D, type LoadedScene3D,
 } from '@umicat/three-sdk';
@@ -40,8 +40,19 @@ const HIT_STUN_SECONDS = 0.4;
 // the start of a run (so getting your bearings doesn't cost a heart).
 const HIT_INVINCIBLE_SECONDS = 1.6;
 const START_INVINCIBLE_SECONDS = 2.0;
-const CONTACT_RANGE = 0.55;
-const CONTACT_COOLDOWN_SECONDS = 1.4;
+// --- Enemies swing at you rather than damaging you by touch. ---
+//
+// Contact damage is not a fight: standing next to something drains you on a
+// timer with nothing to react to, and backing off is the only counterplay
+// there has ever been. A wind-up you can see and step out of turns the same
+// numbers into an exchange.
+const ENEMY_ATTACK_RANGE = 0.72;
+/** The tell. Damage lands at the END of this, and only if you are still there. */
+const ENEMY_WINDUP_SECONDS = 0.34;
+const ENEMY_ATTACK_COOLDOWN = 1.5;
+/** How far a swing still reaches when it lands — slightly beyond the trigger,
+ *  so stepping back has to be deliberate rather than accidental. */
+const ENEMY_REACH = 0.85;
 
 // Every critter shares a capsule sized for the kit's blob characters (they
 // stand a bit taller than the hero's own capsule).
@@ -68,14 +79,14 @@ interface EnemyDef {
 }
 
 const ENEMY_DEFS: EnemyDef[] = [
-  { id: 'enemy_oobi', modelAssetId: 'enemy-oobi', spawn: { x: -2.0, y: 0.5, z: -0.5 }, leash: 3.2, detectRadius: 2.6, speed: 0.85, hp: 2, activateAt: 0 },
-  { id: 'enemy_oodi', modelAssetId: 'enemy-oodi', spawn: { x: 2.0, y: 0.5, z: 2.6 }, leash: 3.2, detectRadius: 2.6, speed: 0.85, hp: 2, activateAt: 8 },
-  { id: 'enemy_ooli', modelAssetId: 'enemy-ooli', spawn: { x: -3.6, y: 0.5, z: 3.6 }, leash: 3.2, detectRadius: 2.6, speed: 0.85, hp: 2, activateAt: 16 },
-  { id: 'enemy_oopi', modelAssetId: 'enemy-oopi', spawn: { x: 0.0, y: 0.5, z: -4.6 }, leash: 3.2, detectRadius: 2.6, speed: 0.85, hp: 2, activateAt: 24 },
+  { id: 'enemy_oobi', modelAssetId: 'enemy-oobi', spawn: { x: -2.0, y: 0.5, z: -0.5 }, leash: 3.2, detectRadius: 2.6, speed: 1.35, hp: 2, activateAt: 0 },
+  { id: 'enemy_oodi', modelAssetId: 'enemy-oodi', spawn: { x: 2.0, y: 0.5, z: 2.6 }, leash: 3.2, detectRadius: 2.6, speed: 1.35, hp: 2, activateAt: 8 },
+  { id: 'enemy_ooli', modelAssetId: 'enemy-ooli', spawn: { x: -3.6, y: 0.5, z: 3.6 }, leash: 3.2, detectRadius: 2.6, speed: 1.35, hp: 2, activateAt: 16 },
+  { id: 'enemy_oopi', modelAssetId: 'enemy-oopi', spawn: { x: 0.0, y: 0.5, z: -4.6 }, leash: 3.2, detectRadius: 2.6, speed: 1.35, hp: 2, activateAt: 24 },
   // Stationed on the top platform — its leash is short enough that it never
   // wanders off the edge; the player has to climb up to reach it. Reaching it
   // at all is already gated by the platform course, so it wakes up immediately.
-  { id: 'enemy_oozi', modelAssetId: 'enemy-oozi', spawn: { x: 5.4, y: 1.35, z: -3.0 }, leash: 0.35, detectRadius: 3.4, speed: 0.8, hp: 2, activateAt: 0 },
+  { id: 'enemy_oozi', modelAssetId: 'enemy-oozi', spawn: { x: 5.4, y: 1.35, z: -3.0 }, leash: 0.35, detectRadius: 3.4, speed: 1.25, hp: 2, activateAt: 0 },
 ];
 
 interface EnemyRuntime {
@@ -86,7 +97,9 @@ interface EnemyRuntime {
   alive: boolean;
   dying: boolean;
   hp: number;
-  hitCooldown: number; // seconds until this enemy can deal contact damage again
+  hitCooldown: number; // seconds until this enemy may swing again
+  /** Counts down through a wind-up; the blow lands when it reaches zero. */
+  windup: number;
   hitStun: number; // seconds left frozen + knocked back after being hit
   dieTimer: number;
 }
@@ -114,7 +127,10 @@ async function start(): Promise<void> {
     position: SPAWN,
     halfHeight: PLAYER_HALF_HEIGHT,
     radius: PLAYER_RADIUS,
-    speed: 1.9,
+    // ~4.2 character-heights a second. Fast enough that crossing the arena is
+    // not a chore, and comfortably quicker than the critters (1.35) so backing
+    // out of a fight is always available.
+    speed: 3.0,
     stepHeight: 0.17,
     jumpSpeed: 2.8,
   });
@@ -164,7 +180,7 @@ async function start(): Promise<void> {
     const enemyAnimator = mixer ? new CharacterAnimator(mixer, clips, enemyClipMap) : null;
     return {
       def, controller, mesh, animator: enemyAnimator,
-      alive: true, dying: false, hp: def.hp, hitCooldown: 0, hitStun: 0, dieTimer: 0,
+      alive: true, dying: false, hp: def.hp, hitCooldown: 0, hitStun: 0, dieTimer: 0, windup: 0,
     };
   });
   const totalEnemies = enemies.length;
@@ -282,6 +298,7 @@ async function start(): Promise<void> {
       // guard on the platform while standing on the ground below it).
       if (Math.abs(enemy.mesh.position.y - hero.position.y) > 0.7) continue;
       enemy.hp -= 1;
+      flashTint(enemy.mesh, { color: 0xff2a1a, ms: 180 });
       if (enemy.hp <= 0) {
         enemy.dying = true;
         enemy.animator?.play('die', { interrupt: true });
@@ -316,6 +333,7 @@ async function start(): Promise<void> {
   const enemyDir = { x: 0, z: 0 };
   const enemySpawnOffset = new THREE.Vector3();
 
+  const tinted: THREE.Object3D[] = [hero, ...enemies.map((e) => e.mesh)];
   let last = performance.now();
   renderer.setAnimationLoop((now: number) => {
     // Clamped: a backgrounded tab returns with a multi-second delta and
@@ -366,9 +384,9 @@ async function start(): Promise<void> {
         const dz = hero.position.z - pos.z;
         const distToPlayer = Math.hypot(dx, dz);
 
-        // Frozen for a beat after being hit, or hasn't woken up yet — either
-        // way, no chasing this frame.
-        const canChase = enemy.hitStun <= 0 && runTime >= enemy.def.activateAt;
+        // Frozen for a beat after being hit, mid-swing, or not awake yet.
+        // Planting its feet to swing is what makes the wind-up readable.
+        const canChase = enemy.hitStun <= 0 && enemy.windup <= 0 && runTime >= enemy.def.activateAt;
         enemyDir.x = 0; enemyDir.z = 0;
         if (canChase && distToPlayer < enemy.def.detectRadius && distToPlayer > 0.001) {
           const nx = dx / distToPlayer;
@@ -382,24 +400,40 @@ async function start(): Promise<void> {
         enemy.controller.update(dt, enemyDir, {});
         enemy.controller.syncTo(enemy.mesh, ENEMY_SYNC_OFFSET);
         enemy.controller.faceTowards(enemy.mesh, enemyDir, dt);
+        // `update` drives the LOCOMOTION layer, which CharacterAnimator keeps
+        // underneath a one-shot — so this does not interrupt a swing.
         enemy.animator?.update(enemy.controller.state === 'walk' ? 'walk' : 'idle');
 
-        // Contact damage — full 3D distance so the platform guard can't
-        // reach a player still standing on the ground below it. Suppressed
-        // during hitstun too, since a freshly-knocked-back critter shouldn't
-        // be able to trade a hit back before it's recovered.
+        // --- Swinging. Full 3D distance, so the guard on the platform can't
+        // reach a player standing on the ground below it. ---
         const dy = enemy.mesh.position.y - hero.position.y;
         const dist3d = Math.hypot(dx, dy, dz);
-        if (enemy.hitStun <= 0 && dist3d < CONTACT_RANGE && enemy.hitCooldown <= 0 && invincibleLeft <= 0) {
-          enemy.hitCooldown = CONTACT_COOLDOWN_SECONDS;
-          invincibleLeft = HIT_INVINCIBLE_SECONDS;
-          playerHP -= 1;
-          renderHud();
-          flashHit();
-          if (playerHP <= 0) endRun(false);
+
+        if (enemy.windup > 0) {
+          enemy.windup -= dt;
+          if (enemy.windup <= 0) {
+            // The blow lands NOW, and only if you are still standing there.
+            // That gap between the tell and the hit is the whole difference
+            // between a fight and a damage-over-time aura.
+            if (dist3d < ENEMY_REACH && invincibleLeft <= 0 && !gameOver) {
+              invincibleLeft = HIT_INVINCIBLE_SECONDS;
+              playerHP -= 1;
+              renderHud();
+              flashHit();
+              flashTint(hero, { color: 0xff2a1a, ms: 220 });
+              if (playerHP <= 0) endRun(false);
+            }
+          }
+        } else if (enemy.hitStun <= 0 && enemy.hitCooldown <= 0 && dist3d < ENEMY_ATTACK_RANGE) {
+          enemy.windup = ENEMY_WINDUP_SECONDS;
+          enemy.hitCooldown = ENEMY_ATTACK_COOLDOWN;
+          enemy.animator?.play('attack', { interrupt: true });
         }
       }
     }
+
+    // Restore anything whose hit-flash has expired.
+    updateTints(tinted);
 
     world.update(dt); // animation + physics + follow camera
     renderer.render(world.scene, world.camera);
