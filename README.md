@@ -1,4 +1,9 @@
-# umicat-template-3d
+# umicat-template — `template-3d`
+
+The starter a **3D** game is forked from. `main` on this same repo is the 2D
+(Phaser) starter; `gitManager.templateBranchFor(runtime)` picks between them,
+and both are branches of the ONE per-user fork so clone/push/restore stay
+runtime-independent. See umicat-design/plans/3d-project-creation.md.
 
 The starter a new **3D** Umicat game is forked from — the 3D sibling of
 `umicat-template`.
