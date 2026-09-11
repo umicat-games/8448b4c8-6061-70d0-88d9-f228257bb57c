@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Umicat Game</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { height: 100%; overflow: hidden; background: #000; }
+      canvas { display: block; width: 100%; height: 100%; }
+      /* Simple text HUD. A 3D game's UI is DOM on the web — there is no reason
+         to draw a score with triangles. */
+      #hud {
+        position: fixed; left: 16px; top: 14px; pointer-events: none;
+        font: 600 16px/1.5 system-ui, sans-serif; color: #fff;
+        text-shadow: 0 2px 6px rgba(0,0,0,.55); max-width: 80vw;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="hud"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

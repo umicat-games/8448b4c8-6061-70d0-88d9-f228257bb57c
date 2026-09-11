@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "initialScene": "main",
+  "scenes": [{ "id": "main", "file": "main.json" }],
+  "models": [
+    {
+      "id": "hero",
+      "path": "assets/Fox.glb",
+      "importScale": 0.035,
+      "animations": { "idle": "Survey", "walk": "Walk", "run": "Run" }
+    }
+  ]
+}
