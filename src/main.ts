@@ -54,8 +54,12 @@ async function start(): Promise<void> {
     position: saved ?? SPAWN,
     halfHeight: 0.2,
     radius: 0.16,
-    speed: 1.9,        // ~2.6 character-heights per second, as before
-    stepHeight: 0.17,  // a quarter of the character's height, as before
+    speed: 1.9,        // ~2.6 character-heights per second
+    stepHeight: 0.17,  // a quarter of the character's height
+    // ~0.9 units up, a bit over one character height. The SDK owns how a jump
+    // FEELS — coyote time, buffering, variable height — because every 3D game
+    // shares this character (ADR-034); this is just how high.
+    jumpSpeed: 2.8,
   });
   const input = new Input3D();
 
@@ -79,14 +83,17 @@ async function start(): Promise<void> {
     if (!clip) { console.warn(`[umicat] no clip for '${semantic}' -> '${real}'`); return null; }
     return heroMixer ? heroMixer.clipAction(clip) : null;
   };
-  const idleAction = actionFor('idle');
-  const walkAction = actionFor('walk');
-  let current: THREE.AnimationAction | null = idleAction;
+  const actions: Record<string, THREE.AnimationAction | null> = {
+    idle: actionFor('idle'), walk: actionFor('walk'),
+    jump: actionFor('jump'), fall: actionFor('fall'),
+  };
+  let current: THREE.AnimationAction | null = actions.idle;
   let currentName = 'idle';
   current?.play();
 
-  const setLocomotion = (next: THREE.AnimationAction | null, name: string): void => {
-    if (!next || next === current) return;
+  const setLocomotion = (name: string): void => {
+    const next = actions[name] ?? actions.idle;
+    if (!next || next === current) { if (next) currentName = name; return; }
     // Cross-fade rather than cut — the difference between a character that
     // moves and one that teleports between poses.
     next.reset().setLoop(THREE.LoopRepeat, Infinity).fadeIn(0.15).play();
@@ -111,7 +118,11 @@ async function start(): Promise<void> {
   resize();
   window.addEventListener('resize', resize);
 
-  hud.textContent = umicat.user ? `Hello, ${umicat.user.name}` : 'Playing as a guest';
+  // Write into a CHILD, never `hud.textContent` — that wipes every child the
+  // HUD has, which is how the on-screen touch controls used to disappear.
+  const greeting = document.createElement('div');
+  greeting.textContent = umicat.user ? `Hello, ${umicat.user.name}` : 'Playing as a guest';
+  hud.appendChild(greeting);
 
   // Saving every frame would hammer the host; coalesce instead.
   let pending: ReturnType<typeof setTimeout> | undefined;
@@ -133,20 +144,22 @@ async function start(): Promise<void> {
     last = now;
     const dir = input.direction();
 
-    character.update(dt, dir);
+    character.update(dt, dir, { jump: input.jump });
 
     // The floor under the floor. Rapier's character controller resolves against
     // contacts rather than integrating through them, so putting the body back
     // is enough — the next frame lands and clears the fall speed.
     if (character.position.y < RESPAWN_BELOW_Y) {
-      character.body.setTranslation(SPAWN, true);
+      character.teleport(SPAWN);
     }
 
     character.syncTo(hero, -0.36);          // capsule centre → the model's feet (halfHeight + radius)
     character.faceTowards(hero, dir, dt);
 
-    const moving = Math.hypot(dir.x, dir.z) > 0;
-    setLocomotion(moving ? walkAction : idleAction, moving ? 'walk' : 'idle');
+    // The controller decides what the character is DOING; the game only maps
+    // that to a clip. Deriving it from input instead is how a character keeps
+    // walking in mid-air.
+    setLocomotion(character.state);
     // Save only while STANDING on something. A position saved mid-air restores
     // you mid-air, which turns one fall into a permanently broken save.
     if (Math.hypot(dir.x, dir.z) > 0 && character.grounded) save();

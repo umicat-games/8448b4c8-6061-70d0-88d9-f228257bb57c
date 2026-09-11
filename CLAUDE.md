@@ -66,6 +66,21 @@ rotation is overwritten by the entity's authored transform. Getting this wrong
 once left every "ground" standing upright as a wall, which renders convincingly
 until the camera crosses to the other side.
 
+**Jump and the on-screen controls belong to the SDK, not to your game.**
+`update(dt, dir, { jump })` takes the button's current state; coyote time,
+input buffering and the release-cut live in `CharacterController3D` because
+every 3D game shares this character (ADR-034). `Input3D` adds a thumbstick and
+jump button on touch devices and merges them into the same `direction()` and
+`jump`, so nothing here branches on input source.
+
+**Never write `hud.textContent`.** It wipes every child the HUD has. Append a
+child element instead. The platform's touch controls mount to `<body>` for
+exactly this reason, but anything YOU put in the HUD is still yours to lose.
+
+**Animate from `character.state`, not from input.** `idle`/`walk`/`jump`/`fall`
+describe what the character is doing; a clip chosen from the key that is held
+leaves it walking in mid-air.
+
 **Gravity is an acceleration, not a displacement.** Feeding a character
 controller a constant downward offset each frame passes a wall test and fails a
 step test. `CharacterController3D` already handles this.
