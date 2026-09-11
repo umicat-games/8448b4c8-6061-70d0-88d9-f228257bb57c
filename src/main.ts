@@ -117,7 +117,10 @@ async function start(): Promise<void> {
     stepHeight: 0.17,
     jumpSpeed: 2.8,
   });
-  const input = new Input3D();
+  // The swing is declared, not drawn. Building the button here is what put it
+  // on top of the jump button on a phone -- same corner, and the platform's
+  // layer sits above, so the attack button could not be tapped at all.
+  const input = new Input3D({ actions: [{ id: 'attack', label: '⚔', keys: ['KeyJ'] }] });
 
   const heroMixer = world.mixerFor.get('hero');
   const clipMap: Record<string, string> =
@@ -244,17 +247,6 @@ async function start(): Promise<void> {
     setTimeout(() => { hitFlash.style.background = 'rgba(220, 30, 30, 0)'; }, 120);
   };
 
-  // --- Touch attack button. Input3D already gives us a thumbstick + jump on
-  // phones; the swing is game-specific, so we build this one ourselves. ---
-  const attackBtn = document.createElement('button');
-  attackBtn.textContent = '⚔';
-  attackBtn.style.cssText = `
-    position: fixed; right: 22px; bottom: 26px; width: 68px; height: 68px; border-radius: 50%;
-    border: 2px solid rgba(255,255,255,0.6); background: rgba(20,20,20,0.45); color: #fff;
-    font-size: 28px; z-index: 5; touch-action: none; -webkit-tap-highlight-color: transparent;
-  `;
-  document.body.appendChild(attackBtn);
-
   // Saving high scores is cheap and only on the score, so no coalescing needed
   // here — writes only happen once, at the end of a run (see endRun).
 
@@ -300,11 +292,8 @@ async function start(): Promise<void> {
     }
   };
 
-  attackBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); tryAttack(); });
-
   // three.js deprecated Clock, and setAnimationLoop already hands us the
   // timestamp, so there is nothing to replace it with.
-  let attackWasDown = false;
   // Untouchable for a couple of seconds at the start of the run — enough to
   // get oriented before anything can land a hit.
   let invincibleLeft = START_INVINCIBLE_SECONDS;
@@ -330,9 +319,9 @@ async function start(): Promise<void> {
       character.syncTo(hero, PLAYER_SYNC_OFFSET);
       character.faceTowards(hero, dir, dt);
 
-      const attackDown = input.isDown('KeyJ');
-      if (attackDown && !attackWasDown) tryAttack();
-      attackWasDown = attackDown;
+      // One press is one swing, latched at the event: a tap that starts and
+      // ends between two frames is invisible to a frame-to-frame edge check.
+      if (input.consume('attack')) tryAttack();
       animator?.update(character.state);
 
       if (invincibleLeft > 0) invincibleLeft -= dt;
@@ -403,7 +392,13 @@ async function start(): Promise<void> {
 
   // Handy while developing; harmless in a published build.
   Object.assign(window as unknown as Record<string, unknown>,
-    { __game: { umicat, world, character, input, animator, enemies } as unknown });
+    // `locomotion` is part of the shape the shared 3D probes expect
+    // (umicat-infra/playwright/verify-3d-*.mjs). Keeping the handle uniform
+    // across games is what lets one harness check all of them.
+    { __game: {
+      umicat, world, character, input, animator, enemies,
+      locomotion: () => animator?.action || character.state,
+    } as unknown });
 }
 
 void start().catch((err) => {
