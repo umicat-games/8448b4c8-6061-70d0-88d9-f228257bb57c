@@ -1,13 +1,28 @@
 {
   "schemaVersion": 1,
   "initialScene": "main",
-  "scenes": [{ "id": "main", "file": "main.json" }],
+  "scenes": [
+    {
+      "id": "main",
+      "file": "main.json"
+    }
+  ],
   "models": [
     {
       "id": "hero",
-      "path": "assets/Fox.glb",
-      "importScale": 0.035,
-      "animations": { "idle": "Survey", "walk": "Walk", "run": "Run" }
+      "path": "assets/character.glb",
+      "importScale": 0.35,
+      "animations": {
+        "idle": "HumanArmature|Man_Idle",
+        "walk": "HumanArmature|Man_Walk",
+        "run": "HumanArmature|Man_Run",
+        "jump": "HumanArmature|Man_Jump",
+        "runningJump": "HumanArmature|Man_RunningJump",
+        "sit": "HumanArmature|Man_Sitting",
+        "clap": "HumanArmature|Man_Clapping",
+        "punch": "HumanArmature|Man_Punch",
+        "die": "HumanArmature|Man_Death"
+      }
     }
   ]
 }

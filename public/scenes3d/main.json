@@ -2,38 +2,150 @@
   "schemaVersion": 1,
   "id": "main",
   "name": "Main",
-  "environment": { "background": "#8fc9e8" },
-  "gravity": { "x": 0, "y": -9.81, "z": 0 },
+  "environment": {
+    "background": "#8fc9e8"
+  },
+  "gravity": {
+    "x": 0,
+    "y": -9.81,
+    "z": 0
+  },
   "lights": [
-    { "id": "sun", "kind": "directional", "intensity": 2.1, "position": { "x": 8, "y": 14, "z": 6 }, "castShadow": true },
-    { "id": "sky", "kind": "hemisphere", "intensity": 1.1, "color": "#cfe8ff", "groundColor": "#6a6a55" }
+    {
+      "id": "sun",
+      "kind": "directional",
+      "intensity": 2.1,
+      "position": {
+        "x": 8,
+        "y": 14,
+        "z": 6
+      },
+      "castShadow": true
+    },
+    {
+      "id": "sky",
+      "kind": "hemisphere",
+      "intensity": 1.1,
+      "color": "#cfe8ff",
+      "groundColor": "#6a6a55"
+    }
   ],
   "entities": [
     {
       "id": "ground",
-      "primitive": { "kind": "plane", "size": { "x": 30, "y": 1, "z": 30 }, "color": "#7f8a6a" },
-      "transform": { "position": { "x": 0, "y": 0, "z": 0 } },
-      "collider": { "body": "fixed", "shape": { "kind": "box", "halfExtents": { "x": 15, "y": 0.05, "z": 15 } } }
+      "primitive": {
+        "kind": "plane",
+        "size": {
+          "x": 30,
+          "y": 1,
+          "z": 30
+        },
+        "color": "#7f8a6a"
+      },
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      },
+      "collider": {
+        "body": "fixed",
+        "shape": {
+          "kind": "box",
+          "halfExtents": {
+            "x": 15,
+            "y": 0.05,
+            "z": 15
+          }
+        }
+      }
     },
     {
       "id": "wall_back",
-      "primitive": { "kind": "box", "size": { "x": 20, "y": 2, "z": 0.5 }, "color": "#b9a382" },
-      "transform": { "position": { "x": 0, "y": 1, "z": -10 } },
-      "collider": { "body": "fixed", "shape": { "kind": "box", "halfExtents": { "x": 10, "y": 1, "z": 0.25 } } }
+      "primitive": {
+        "kind": "box",
+        "size": {
+          "x": 20,
+          "y": 2,
+          "z": 0.5
+        },
+        "color": "#b9a382"
+      },
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 1,
+          "z": -10
+        }
+      },
+      "collider": {
+        "body": "fixed",
+        "shape": {
+          "kind": "box",
+          "halfExtents": {
+            "x": 10,
+            "y": 1,
+            "z": 0.25
+          }
+        }
+      }
     },
     {
       "id": "crate",
-      "primitive": { "kind": "box", "size": { "x": 1, "y": 1, "z": 1 }, "color": "#d9a44f" },
-      "transform": { "position": { "x": 3, "y": 4, "z": -2 } },
-      "collider": { "body": "dynamic", "shape": { "kind": "box", "halfExtents": { "x": 0.5, "y": 0.5, "z": 0.5 } } }
+      "primitive": {
+        "kind": "box",
+        "size": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "color": "#d9a44f"
+      },
+      "transform": {
+        "position": {
+          "x": 3,
+          "y": 4,
+          "z": -2
+        }
+      },
+      "collider": {
+        "body": "dynamic",
+        "shape": {
+          "kind": "box",
+          "halfExtents": {
+            "x": 0.5,
+            "y": 0.5,
+            "z": 0.5
+          }
+        }
+      }
     },
     {
       "id": "hero",
       "modelAssetId": "hero",
       "name": "hero",
-      "transform": { "position": { "x": 0, "y": 0, "z": 4 } },
-      "animation": { "play": "idle", "loop": true }
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 4
+        }
+      },
+      "animation": {
+        "play": "idle",
+        "loop": true
+      }
     }
   ],
-  "camera": { "kind": "follow", "target": "hero", "offset": { "x": 0, "y": 5, "z": 11 }, "fov": 55 }
+  "camera": {
+    "kind": "follow",
+    "target": "hero",
+    "offset": {
+      "x": 0,
+      "y": 2.6,
+      "z": 5.5
+    },
+    "fov": 55
+  }
 }
