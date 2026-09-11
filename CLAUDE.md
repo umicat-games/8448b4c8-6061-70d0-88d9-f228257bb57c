@@ -56,6 +56,13 @@ follow its bones, so three.js culls a character against a stale volume and it
 vanishes the moment it moves. `loadScene3D` already sets `frustumCulled = false`
 on skinned meshes; if you add a character by hand, do the same.
 
+**An action is a one-shot, not a state.** The character ships 32 clips —
+`attack`, `kick`, `pick-up`, `interact`, `holding-*` (including shooting),
+`die`, `emote-yes/no` — and `CharacterAnimator.play('attack')` runs one once and
+hands control back. Gate on `animator.busy` so one press is one swing, and use
+an edge check if you do not want holding the key to chain them. Locomotion keeps
+following `character.state` underneath.
+
 **Use the prop kit before you draw scenery out of boxes.** `public/kit/` ships
 86 real models with a catalogue at `public/kit/index.json`. A coloured box named
 `crystal` is still a box, and a scene of them reads as a prototype.

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
-  ThreeUmicat, loadScene3D, CharacterController3D, Input3D,
+  ThreeUmicat, loadScene3D, CharacterController3D, CharacterAnimator, Input3D,
   type Scene3D, type Manifest3D, type LoadedScene3D,
 } from '@umicat/three-sdk';
 import { GAME_WIDTH, GAME_HEIGHT } from './config';
@@ -63,45 +63,16 @@ async function start(): Promise<void> {
   });
   const input = new Input3D();
 
-  // Locomotion: idle <-> walk. The scene starts a clip and the SDK exposes the
-  // mixer, but NOTHING was switching it — so the character slid around playing
-  // its idle animation, which looks like no animation at all and is easy to
-  // miss in a test, because idle moves bones too.
-  //
-  // Under ADR-034 this belongs in the platform, not in each game: once every
-  // game shares one character, "which clip plays when you move" is the
-  // character's behaviour. It lives here until the SDK grows it.
+  // Animation. The SDK owns both halves — locomotion follows the controller's
+  // state, and an action is a one-shot that interrupts and returns. Neither is
+  // game logic: once every game shares one character, they are the character's
+  // behaviour (ADR-034).
   const heroMixer = world.mixerFor.get('hero');
-  const heroClips = world.clips.get('hero') ?? [];
-  // Semantic name -> the clip actually inside the file. Never guess: this
-  // character calls its run `sprint`.
   const clipMap: Record<string, string> =
     (manifest.models?.find((m) => m.id === 'hero') as { animations?: Record<string, string> } | undefined)?.animations ?? {};
-  const actionFor = (semantic: string): THREE.AnimationAction | null => {
-    const real = clipMap[semantic] ?? semantic;
-    const clip = heroClips.find((c) => c.name === real);
-    if (!clip) { console.warn(`[umicat] no clip for '${semantic}' -> '${real}'`); return null; }
-    return heroMixer ? heroMixer.clipAction(clip) : null;
-  };
-  const actions: Record<string, THREE.AnimationAction | null> = {
-    idle: actionFor('idle'), walk: actionFor('walk'),
-    jump: actionFor('jump'), fall: actionFor('fall'),
-  };
-  let current: THREE.AnimationAction | null = actions.idle;
-  let currentName = 'idle';
-  current?.play();
-
-  const setLocomotion = (name: string): void => {
-    const next = actions[name] ?? actions.idle;
-    if (!next || next === current) { if (next) currentName = name; return; }
-    // Cross-fade rather than cut — the difference between a character that
-    // moves and one that teleports between poses.
-    next.reset().setLoop(THREE.LoopRepeat, Infinity).fadeIn(0.15).play();
-    current?.fadeOut(0.15);
-    current = next;
-    currentName = name;
-  };
-
+  const animator = heroMixer
+    ? new CharacterAnimator(heroMixer, world.clips.get('hero') ?? [], clipMap)
+    : null;
 
   // 4) Render. The canvas is in index.html; the game owns the loop.
   const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -136,6 +107,7 @@ async function start(): Promise<void> {
 
   // three.js deprecated Clock, and setAnimationLoop already hands us the
   // timestamp, so there is nothing to replace it with.
+  let attackWasDown = false;
   let last = performance.now();
   renderer.setAnimationLoop((now: number) => {
     // Clamped: a backgrounded tab returns with a multi-second delta and
@@ -156,10 +128,14 @@ async function start(): Promise<void> {
     character.syncTo(hero, -0.36);          // capsule centre → the model's feet (halfHeight + radius)
     character.faceTowards(hero, dir, dt);
 
-    // The controller decides what the character is DOING; the game only maps
-    // that to a clip. Deriving it from input instead is how a character keeps
-    // walking in mid-air.
-    setLocomotion(character.state);
+    // One press is one swing. Two guards, doing different jobs: the edge check
+    // means holding the key does not chain swings (drop it and you get
+    // hold-to-attack, which is a game's decision), and the animator's `busy`
+    // means a second press mid-swing is ignored rather than restarting it.
+    const attackDown = input.isDown('KeyJ');
+    if (attackDown && !attackWasDown && animator && !animator.busy) animator.play('attack');
+    attackWasDown = attackDown;
+    animator?.update(character.state);
     // Save only while STANDING on something. A position saved mid-air restores
     // you mid-air, which turns one fall into a permanently broken save.
     if (Math.hypot(dir.x, dir.z) > 0 && character.grounded) save();
@@ -170,7 +146,7 @@ async function start(): Promise<void> {
 
   // Handy while developing; harmless in a published build.
   Object.assign(window as unknown as Record<string, unknown>,
-    { __game: { umicat, world, character, input, locomotion: () => currentName } as unknown });
+    { __game: { umicat, world, character, input, animator, locomotion: () => animator?.action || character.state } as unknown });
 }
 
 void start().catch((err) => {
