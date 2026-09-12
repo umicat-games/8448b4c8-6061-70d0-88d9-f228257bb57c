@@ -280,11 +280,28 @@ async function start(): Promise<void> {
   const canvas = document.getElementById('game') as HTMLCanvasElement;
   const hudEl = document.getElementById('hud')!;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  // A phone reports 3 and gets 1.5, not 2. Two means four times the fragments
-  // of a 1x screen, and on a board this size that was the difference between
-  // smooth and visibly dropping frames — for a sharpness nobody asked about.
+  // Render resolution, and the one graphics setting here that genuinely trades
+  // picture for speed. A phone reports 3; 1.5 is the default because 2 is 1.8x
+  // the fragments. `?dpr=2` to compare — the point is that this is decidable
+  // by looking at the screen and the frame counter at the same time, on the
+  // device, rather than by me picking a number on a laptop.
+  const flags = new URLSearchParams(location.search);
   const dpr = window.devicePixelRatio ?? 1;
-  renderer.setPixelRatio(Math.min(dpr, dpr > 2 ? 1.5 : 2));
+  const dprFlag = Number(flags.get('dpr'));
+  renderer.setPixelRatio(dprFlag > 0 ? Math.min(dpr, dprFlag) : Math.min(dpr, dpr > 2 ? 1.5 : 2));
+
+  // Shadow crispness. The SDK sizes this for the device (1024, or 512 where the
+  // screen is dense); `?shadow=2048` to see what the extra sharpness is worth.
+  const shadowFlag = Number(flags.get('shadow'));
+  if (shadowFlag > 0) {
+    for (const l of world.scene.children) {
+      const d = l as THREE.DirectionalLight;
+      if (!d.isDirectionalLight || !d.castShadow) continue;
+      d.shadow.mapSize.set(shadowFlag, shadowFlag);
+      d.shadow.map?.dispose();
+      d.shadow.map = null as unknown as THREE.WebGLRenderTarget;
+    }
+  }
   renderer.shadowMap.enabled = true;
   const resize = (): void => {
     renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -732,6 +749,10 @@ async function start(): Promise<void> {
         return d;
       })();
   let fpsFrames = 0, fpsSince = performance.now(), fpsWorst = 0;
+  const shadowOf = (): string => {
+    const d = world.scene.children.find((c) => (c as THREE.DirectionalLight).isDirectionalLight) as THREE.DirectionalLight | undefined;
+    return d ? `${d.shadow.mapSize.width}` : 'none';
+  };
 
   let last = performance.now();
   const dir = new THREE.Vector3();
@@ -934,7 +955,8 @@ async function start(): Promise<void> {
         debugHud.textContent =
           `${fps.toFixed(0)} fps   worst ${fpsWorst.toFixed(0)}ms\n` +
           `${info.calls} draws  ${(info.triangles / 1000).toFixed(0)}k tris\n` +
-          `dpr ${window.devicePixelRatio} → ${renderer.getPixelRatio()}  ${renderer.domElement.width}×${renderer.domElement.height}`;
+          `dpr ${window.devicePixelRatio} → ${renderer.getPixelRatio()}  ${renderer.domElement.width}×${renderer.domElement.height}\n` +
+          `shadow ${shadowOf()}`;
         fpsFrames = 0; fpsSince = now; fpsWorst = 0;
       }
     }

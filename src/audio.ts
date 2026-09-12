@@ -61,22 +61,36 @@ export class GameAudio {
   private readonly buffers = new Map<string, AudioBuffer>();
   private readonly lastPlayed = new Map<string, number>();
   private muted = false;
-  private unlocked = false;
+
+  /** Whether sound can actually be heard right now.
+   *
+   *  Asked of the context every time rather than cached in a flag. The cached
+   *  version was the bug: `resume()` is asynchronous, the state is still
+   *  'suspended' on the line after it, so the flag was set to false forever and
+   *  the game was silent no matter how many times it was tapped. A derived
+   *  answer cannot go stale. */
+  private get ready(): boolean { return this.ctx?.state === 'running'; }
 
   constructor(private readonly base = 'audio/') {
     const unlock = (): void => {
-      void this.start();
-      if (this.unlocked) {
+      void this.start().then(() => {
+        if (!this.ready) return;
         for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.removeEventListener(ev, unlock);
-      }
+      });
     };
     for (const ev of ['pointerdown', 'keydown', 'touchstart']) {
       window.addEventListener(ev, unlock);
     }
+    // iOS suspends the context when the app goes away, and it does not come
+    // back on its own — without this, sound works until the first time someone
+    // takes a call and then never again.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && this.ctx && this.ctx.state === 'suspended') void this.ctx.resume();
+    });
   }
 
   private async start(): Promise<void> {
-    if (this.unlocked) return;
+    if (this.ready) return;
     const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
     if (!this.ctx) {
@@ -89,10 +103,10 @@ export class GameAudio {
       this.musicGain.connect(this.master);
       void this.loadAll();
     }
-    // Resuming has to happen inside the gesture's call stack on iOS.
-    void this.ctx.resume();
-    this.unlocked = this.ctx.state === 'running';
-    if (this.unlocked) this.startMusic();
+    // `resume()` must be CALLED inside the gesture's call stack on iOS, and
+    // awaited before anything asks whether it worked.
+    try { await this.ctx.resume(); } catch { /* a blocked context is not fatal */ }
+    if (this.ready) this.startMusic();
   }
 
   private async loadAll(): Promise<void> {
@@ -114,7 +128,7 @@ export class GameAudio {
         // and "some audio happened" is not a check.
         (buf as AudioBuffer & { __name?: string }).__name = name;
         this.buffers.set(name, buf);
-        if (name === 'bgm' && this.unlocked && !this.musicSource) this.startMusic();
+        if (name === 'bgm' && this.ready && !this.musicSource) this.startMusic();
       } catch {
         /* a clip that will not decode is not worth taking the game down for */
       }
@@ -136,7 +150,8 @@ export class GameAudio {
   }
 
   play(name: string): void {
-    if (this.muted || !this.unlocked || !this.ctx || !this.master) return;
+    const ctx = this.ctx;
+    if (this.muted || !this.ready || !ctx || !this.master) return;
     const buf = this.buffers.get(name);
     if (!buf) return;
     const spec = CLIPS[name];
@@ -145,9 +160,9 @@ export class GameAudio {
     if (gap && now - (this.lastPlayed.get(name) ?? -1e9) < gap) return;
     this.lastPlayed.set(name, now);
 
-    const src = this.ctx.createBufferSource();
+    const src = ctx.createBufferSource();
     src.buffer = buf;
-    const g = this.ctx.createGain();
+    const g = ctx.createGain();
     g.gain.value = spec?.volume ?? 0.5;
     src.connect(g);
     g.connect(this.master);
@@ -172,7 +187,7 @@ export class GameAudio {
     if (this.master && this.ctx) {
       this.master.gain.setTargetAtTime(on ? 0 : 1, this.ctx.currentTime, 0.02);
     }
-    if (!on && this.unlocked) this.startMusic();
+    if (!on && this.ready) this.startMusic();
   }
 
   get isMuted(): boolean { return this.muted; }
