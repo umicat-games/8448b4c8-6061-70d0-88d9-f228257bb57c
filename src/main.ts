@@ -36,10 +36,25 @@ const HERO_INVINCIBLE_SECONDS = 1.4;
 /** They fly, so they float above the path rather than walking it. */
 const ENEMY_FLY_HEIGHT = 0.38;
 const ENEMY_MODEL_SCALE = 0.62;      // the kit's UFOs are a full tile wide
-/** How close a UFO comes before it shoots at the hero, and how hard. */
-const ENEMY_SHOOT_RANGE = 1.7;
-const ENEMY_SHOOT_COOLDOWN = 2.2;
+/** UFOs SHOOT. Nothing about touching one hurts you.
+ *
+ *  It used to be a wind-up and then a distance check, which is a hitscan with
+ *  a delay — and with a 1.7-unit range and nothing visible crossing the gap it
+ *  read as "walking near it costs a heart". A bullet you can see leave, cross
+ *  the ground and miss is a different game, from exactly the same numbers. */
+const ENEMY_SHOOT_RANGE = 3.4;
+const ENEMY_SHOOT_COOLDOWN = 2.4;
+/** The tell, before the shot leaves. */
 const ENEMY_WINDUP_SECONDS = 0.45;
+const BULLET_SPEED = 4.2;         // slower than the hero: it can be outrun
+const BULLET_HIT_RADIUS = 0.38;
+const BULLET_LIFE = 2.6;          // seconds before a miss gives up
+/** A UFO directly on top of you does not shoot. Point blank is the sword's
+ *  range, and a bullet fired from 0.04 units away arrives in ten milliseconds
+ *  — which is a contact hit again, just with extra steps. */
+const ENEMY_MIN_SHOOT_RANGE = 0.9;
+/** Bullets appear this far out, so there is always a gap to see them cross. */
+const BULLET_MUZZLE = 0.55;
 
 // --- towers ---------------------------------------------------------------
 interface TowerKind {
@@ -110,6 +125,14 @@ interface Shot {
   speed: number;
 }
 
+/** An enemy's bullet. It has a DIRECTION, not a target: once it is in the air
+ *  it keeps going, which is what makes stepping aside work. */
+interface Bullet {
+  obj: THREE.Object3D;
+  vel: THREE.Vector3;
+  life: number;
+}
+
 async function start(): Promise<void> {
   const umicat = await ThreeUmicat.init();
   await RAPIER.init();
@@ -167,7 +190,8 @@ async function start(): Promise<void> {
   // Prototypes, cloned per placement. Loading inside the build handler would
   // put a download in the middle of a button press.
   const protos = new Map<string, THREE.Object3D>();
-  for (const id of [...TOWERS.map((t) => t.model), ...TOWERS.map((t) => t.ammo), ...WAVES.map((w) => w.model)]) {
+  for (const id of [...TOWERS.map((t) => t.model), ...TOWERS.map((t) => t.ammo),
+                    ...WAVES.map((w) => w.model), 'td-bullet']) {
     if (protos.has(id)) continue;
     const { object } = await loadModelAsset(manifest, id, { assetBase: '' });
     object.traverse((o) => { if ((o as THREE.Mesh).isMesh) { (o as THREE.Mesh).castShadow = true; } });
@@ -212,6 +236,7 @@ async function start(): Promise<void> {
   const enemies: Enemy[] = [];
   const towers: Tower[] = [];
   const shots: Shot[] = [];
+  const bullets: Bullet[] = [];
   const tinted: THREE.Object3D[] = [hero];
 
   // --- HUD ---
@@ -488,10 +513,28 @@ async function start(): Promise<void> {
         const dHero = Math.hypot(e.obj.position.x - hero.position.x, e.obj.position.z - hero.position.z);
         if (e.windup > 0) {
           e.windup -= dt;
-          if (e.windup <= 0 && dHero < ENEMY_SHOOT_RANGE + 0.3) hurtHero();
+          if (e.windup <= 0) {
+            // Fire at where the hero IS, and then forget about them. A bullet
+            // that steers is a slower contact hit wearing a costume.
+            const v = new THREE.Vector3(
+              hero.position.x - e.obj.position.x,
+              (hero.position.y + 0.3) - e.obj.position.y,
+              hero.position.z - e.obj.position.z,
+            );
+            if (v.lengthSq() < 1e-6) v.set(0, 0, 1);
+            v.normalize();
+            const bullet = spawnFrom('td-bullet');
+            // Out in front, not from inside the hull. Spawned at the centre it
+            // could already be past the player, and at close range it crossed
+            // the gap faster than a frame — invisible damage for being nearby,
+            // which is the thing this was supposed to replace.
+            bullet.position.copy(e.obj.position).addScaledVector(v, BULLET_MUZZLE);
+            bullet.lookAt(bullet.position.clone().add(v));
+            bullets.push({ obj: bullet, vel: v.multiplyScalar(BULLET_SPEED), life: BULLET_LIFE });
+          }
         } else if (e.shootCooldown > 0) {
           e.shootCooldown -= dt;
-        } else if (dHero < ENEMY_SHOOT_RANGE) {
+        } else if (dHero < ENEMY_SHOOT_RANGE && dHero > ENEMY_MIN_SHOOT_RANGE) {
           e.windup = ENEMY_WINDUP_SECONDS;
           e.shootCooldown = ENEMY_SHOOT_COOLDOWN;
           flashTint(e.obj, { color: 0xffd050, ms: ENEMY_WINDUP_SECONDS * 1000 });
@@ -524,7 +567,23 @@ async function start(): Promise<void> {
         }
       }
 
-      // --- shots fly ---
+      // --- enemy bullets fly ---
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const bu = bullets[i];
+        bu.life -= dt;
+        bu.obj.position.addScaledVector(bu.vel, dt);
+        const hit = Math.hypot(
+          bu.obj.position.x - hero.position.x,
+          bu.obj.position.y - (hero.position.y + 0.3),
+          bu.obj.position.z - hero.position.z) < BULLET_HIT_RADIUS;
+        if (hit || bu.life <= 0 || Math.abs(bu.obj.position.x) > 7 || Math.abs(bu.obj.position.z) > 7) {
+          if (hit) hurtHero();
+          world.scene.remove(bu.obj);
+          bullets.splice(i, 1);
+        }
+      }
+
+      // --- tower shots fly ---
       for (let i = shots.length - 1; i >= 0; i--) {
         const s = shots[i];
         if (!s.target.alive) { world.scene.remove(s.obj); shots.splice(i, 1); continue; }
@@ -553,6 +612,7 @@ async function start(): Promise<void> {
       get enemies() { return enemies; },
       get towers() { return towers; },
       get shots() { return shots; },
+      get bullets() { return bullets; },
       state: () => ({ gold, lives, heroHp, waveIndex, running, won, buildCell, selected,
                       standingOn: standingOn ? { kind: standingOn.kind.id, level: standingOn.level } : null,
                       towers: towers.map((t) => ({ kind: t.kind.id, level: t.level, cell: t.cell })) }),

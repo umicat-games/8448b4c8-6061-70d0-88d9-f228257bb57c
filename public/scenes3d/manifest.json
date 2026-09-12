@@ -141,6 +141,11 @@
       "id": "td-tile-dirt",
       "path": "kit/td/tile-dirt.glb",
       "importScale": 1
+    },
+    {
+      "id": "td-bullet",
+      "path": "kit/td/weapon-ammo-bullet.glb",
+      "importScale": 1
     }
   ]
 }
