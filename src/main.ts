@@ -294,6 +294,43 @@ async function start(): Promise<void> {
   resize();
   window.addEventListener('resize', resize);
 
+  // --- Warm every shader before the game starts ---
+  //
+  // A model's FIRST render is where the shader gets compiled and the texture
+  // uploaded, and that is one long frame. It does not land when the object is
+  // created — it lands a frame or two later, when it is first drawn — so it
+  // shows up as "the game hitches when an enemy appears", once per wave,
+  // because each wave uses a different UFO. Measured at 117ms against a 42ms
+  // median.
+  //
+  // Drawing one of everything at a pinhead before the player sees anything
+  // moves all of that into the loading screen where it belongs. Scale matters
+  // only for looks: a bound texture uploads whether it covers one pixel or a
+  // thousand.
+  {
+    const warm: THREE.Object3D[] = [];
+    for (const id of protos.keys()) {
+      const o = protos.get(id)!.clone(true);
+      o.position.copy(world.camera.position).add(new THREE.Vector3(0, -0.4, -1));
+      o.scale.setScalar(0.001);
+      world.scene.add(o);
+      warm.push(o);
+    }
+    // The updraft's additive quads are their own material, so they get a turn
+    // too — otherwise the first upgrade of every run stutters.
+    const spark = new THREE.Mesh(new THREE.PlaneGeometry(0.001, 0.001),
+      new THREE.MeshBasicMaterial({ color: 0xffc94d, transparent: true, opacity: 0.01, depthWrite: false }));
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.001, 0.002, 24),
+      new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.01,
+        side: THREE.DoubleSide, depthWrite: false }));
+    for (const m of [spark, ring]) { m.position.copy(world.camera.position).add(new THREE.Vector3(0, -0.4, -1)); world.scene.add(m); warm.push(m); }
+
+    renderer.compile(world.scene, world.camera);
+    renderer.render(world.scene, world.camera);   // and actually draw them, so textures upload
+    for (const o of warm) o.removeFromParent();
+    spark.geometry.dispose(); ring.geometry.dispose();
+  }
+
   // --- state ---
   let gold = START_GOLD;
   let lives = BASE_LIVES;
@@ -660,17 +697,28 @@ async function start(): Promise<void> {
   // come from the phone. A laptop renders this board without noticing 182 draw
   // calls; an iPhone draws at 3x into a 2048 shadow map and very much does, and
   // nothing about a screenshot from either machine shows the difference.
-  const debugHud = new URLSearchParams(location.search).has('debug')
-    ? (() => {
+  // `?debug=1`, or three taps on the HUD — the app plays games in a webview
+  // with no address bar, so a URL flag is unreachable exactly where the
+  // numbers matter most.
+  const debugHud = (() => {
         const d = document.createElement('div');
         d.style.cssText = `position: fixed; right: 10px; bottom: 10px; z-index: 60;
           font: 600 12px/1.45 ui-monospace, monospace; color: #fff; text-align: right;
           background: rgba(0,0,0,.45); padding: 6px 9px; border-radius: 8px;
           pointer-events: none; white-space: pre;`;
+        d.style.display = new URLSearchParams(location.search).has('debug') ? 'block' : 'none';
         document.body.appendChild(d);
+        let taps = 0, tapAt = 0;
+        hudEl.style.pointerEvents = 'auto';
+        hudEl.addEventListener('pointerdown', (e) => {
+          if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+          const t = performance.now();
+          taps = t - tapAt < 600 ? taps + 1 : 1;
+          tapAt = t;
+          if (taps >= 3) { taps = 0; d.style.display = d.style.display === 'none' ? 'block' : 'none'; }
+        });
         return d;
-      })()
-    : null;
+      })();
   let fpsFrames = 0, fpsSince = performance.now(), fpsWorst = 0;
 
   let last = performance.now();
@@ -865,7 +913,7 @@ async function start(): Promise<void> {
       }
     }
 
-    if (debugHud) {
+    if (debugHud.style.display !== 'none') {
       fpsFrames += 1;
       fpsWorst = Math.max(fpsWorst, dt * 1000);
       if (now - fpsSince > 500) {
