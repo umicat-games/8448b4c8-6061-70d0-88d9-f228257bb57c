@@ -49,12 +49,14 @@ const ENEMY_WINDUP_SECONDS = 0.45;
 const BULLET_SPEED = 4.2;         // slower than the hero: it can be outrun
 const BULLET_HIT_RADIUS = 0.38;
 const BULLET_LIFE = 2.6;          // seconds before a miss gives up
-/** A UFO directly on top of you does not shoot. Point blank is the sword's
- *  range, and a bullet fired from 0.04 units away arrives in ten milliseconds
- *  — which is a contact hit again, just with extra steps. */
-const ENEMY_MIN_SHOOT_RANGE = 0.9;
-/** Bullets appear this far out, so there is always a gap to see them cross. */
-const BULLET_MUZZLE = 0.55;
+/** Bullets appear a little clear of the hull so they are not drawn inside it.
+ *
+ *  There is NO minimum shooting distance. I added one — a UFO on top of you
+ *  could not fire — to stop point-blank hits landing in ten milliseconds, which
+ *  looked like damage for standing nearby. It bought a far worse problem: park
+ *  the hero against a UFO and it can never hurt him, so melee became free.
+ *  A fast hit you barely see beats an enemy that cannot fight back. */
+const BULLET_MUZZLE = 0.15;
 
 // --- towers ---------------------------------------------------------------
 interface TowerKind {
@@ -131,6 +133,21 @@ interface Bullet {
   obj: THREE.Object3D;
   vel: THREE.Vector3;
   life: number;
+}
+
+/** Does the segment a→b pass within `r` of `c`? Closest-point-on-segment.
+ *
+ *  Needed because a bullet can cross a player entirely between two frames:
+ *  testing only where it started and where it ended finds nothing, and the
+ *  shot silently misses at exactly the range it should never miss. */
+const _ab = new THREE.Vector3();
+const _ac = new THREE.Vector3();
+function segmentHitsSphere(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, r: number): boolean {
+  _ab.copy(b).sub(a);
+  _ac.copy(c).sub(a);
+  const len2 = _ab.lengthSq();
+  const t = len2 < 1e-9 ? 0 : Math.max(0, Math.min(1, _ac.dot(_ab) / len2));
+  return _ac.addScaledVector(_ab, -t).lengthSq() <= r * r;
 }
 
 async function start(): Promise<void> {
@@ -244,6 +261,13 @@ async function start(): Promise<void> {
   const line2 = document.createElement('div');
   const line3 = document.createElement('div');
   line3.style.opacity = '0.85';
+  // Gold lives in its own element because a coin flying to the counter needs a
+  // rectangle to aim at, and "somewhere in that line of text" is not one.
+  const livesEl = document.createElement('span');
+  const goldEl = document.createElement('span');
+  const waveEl = document.createElement('span');
+  goldEl.style.transition = 'transform 120ms ease-out';
+  line2.append(livesEl, goldEl, waveEl);
   hudEl.append(line1, line2, line3);
 
   const banner = document.createElement('div');
@@ -269,10 +293,130 @@ async function start(): Promise<void> {
     setTimeout(() => { hitFlash.style.background = 'rgba(220,30,30,0)'; }, 120);
   };
 
+  /** Motes lifting off an upgraded tower — the updraft.
+   *
+   *  In the scene rather than in the DOM, because it has to sit in the world
+   *  next to the tower it belongs to: a DOM flourish over the same pixels
+   *  stops being attached to anything the moment the camera turns.
+   *
+   *  Deliberately cheap: a dozen unlit quads, no texture, no particle system.
+   *  They rise, spiral a little, shrink and fade, and are gone in under a
+   *  second — long enough to see, short enough that upgrading three towers in
+   *  a row does not become a light show. */
+  const updrafts: { obj: THREE.Mesh; t: number; life: number; spin: number; rise: number; r0: number; a0: number }[] = [];
+  const moteGeom = new THREE.PlaneGeometry(0.09, 0.09);
+
+  const updraft = (at: THREE.Vector3): void => {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.18, 0.34, 24),
+      new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.9,
+        side: THREE.DoubleSide, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(at.x, at.y + 0.05, at.z);
+    world.scene.add(ring);
+    updrafts.push({ obj: ring, t: 0, life: 0.55, spin: 0, rise: 0.55, r0: 0, a0: 0.9 });
+
+    for (let i = 0; i < 12; i++) {
+      const a0 = (i / 12) * Math.PI * 2;
+      const r0 = 0.16 + Math.random() * 0.16;
+      const mote = new THREE.Mesh(moteGeom, new THREE.MeshBasicMaterial({
+        color: i % 3 === 0 ? 0xfff2c4 : 0xffc94d, transparent: true, opacity: 1, depthWrite: false,
+      }));
+      mote.position.set(at.x + Math.cos(a0) * r0, at.y + 0.04, at.z + Math.sin(a0) * r0);
+      mote.userData.cx = at.x; mote.userData.cz = at.z;
+      world.scene.add(mote);
+      updrafts.push({ obj: mote, t: 0, life: 0.7 + Math.random() * 0.35,
+                      spin: 2.2 + Math.random() * 1.6, rise: 0.95 + Math.random() * 0.7, r0, a0 });
+    }
+  };
+
+  const updateUpdrafts = (dt: number): void => {
+    for (let i = updrafts.length - 1; i >= 0; i--) {
+      const u = updrafts[i];
+      u.t += dt;
+      const k = u.t / u.life;
+      if (k >= 1) {
+        world.scene.remove(u.obj);
+        (u.obj.material as THREE.Material).dispose();
+        if (u.obj.geometry !== moteGeom) u.obj.geometry.dispose();
+        updrafts.splice(i, 1);
+        continue;
+      }
+      const mat = u.obj.material as THREE.MeshBasicMaterial;
+      if (u.spin === 0) {
+        // The ring: expands outward and thins away.
+        const g = 1 + k * 1.5;
+        u.obj.scale.setScalar(g);
+        mat.opacity = u.a0 * (1 - k);
+      } else {
+        // A mote: rises, drifts round, and always faces the camera so a flat
+        // quad never shows its edge.
+        const a = u.a0 + k * u.spin;
+        const r = u.r0 * (1 + k * 0.5);
+        u.obj.position.y += u.rise * dt;
+        u.obj.position.x = (u.obj.userData.cx as number) + Math.cos(a) * r;
+        u.obj.position.z = (u.obj.userData.cz as number) + Math.sin(a) * r;
+        u.obj.scale.setScalar(1 - k * 0.55);
+        mat.opacity = 1 - k * k;
+        u.obj.quaternion.copy(world.camera.quaternion);
+      }
+    }
+  };
+
+  /** A coin leaves the kill and lands on the counter.
+   *
+   *  Two small things carry it. It starts where the enemy DIED on screen, so
+   *  the reward is attached to the thing that earned it rather than appearing
+   *  in the corner; and the counter only goes up when the coin arrives, so the
+   *  number and the animation are telling the same story instead of two. */
+  const flyCoin = (from: THREE.Vector3, amount: number): void => {
+    const p0 = from.clone().project(world.camera);
+    const sx = (p0.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-p0.y * 0.5 + 0.5) * window.innerHeight;
+    // Behind the camera projects to nonsense; pay out without the flourish.
+    if (!Number.isFinite(sx) || !Number.isFinite(sy) || p0.z > 1) { gold += amount; renderHud(); return; }
+
+    const target = goldEl.getBoundingClientRect();
+    const tx = target.left + target.width * 0.35;
+    const ty = target.top + target.height * 0.5;
+
+    const coin = document.createElement('div');
+    coin.textContent = '💰';
+    coin.style.cssText = `
+      position: fixed; left: 0; top: 0; font-size: 20px; pointer-events: none;
+      z-index: 35; will-change: transform, opacity;
+      transform: translate(${sx - 10}px, ${sy - 10}px) scale(1);
+    `;
+    document.body.appendChild(coin);
+
+    const t0 = performance.now();
+    const DURATION = 520;
+    const step = (t: number): void => {
+      const k = Math.min(1, (t - t0) / DURATION);
+      // Ease out, with a small arc — a coin that travels in a straight line
+      // reads as a UI element sliding, not as something thrown.
+      const e = 1 - Math.pow(1 - k, 3);
+      const x = sx + (tx - sx) * e;
+      const y = sy + (ty - sy) * e - Math.sin(k * Math.PI) * 46;
+      coin.style.transform = `translate(${x - 10}px, ${y - 10}px) scale(${1 - k * 0.35})`;
+      coin.style.opacity = String(k > 0.85 ? (1 - k) / 0.15 : 1);
+      if (k < 1) { requestAnimationFrame(step); return; }
+      coin.remove();
+      gold += amount;
+      renderHud();
+      // A nudge on arrival, so the counter acknowledges being hit.
+      goldEl.style.transform = 'scale(1.22)';
+      setTimeout(() => { goldEl.style.transform = 'scale(1)'; }, 120);
+    };
+    requestAnimationFrame(step);
+  };
+
   const renderHud = (): void => {
     line1.textContent = `${'❤️'.repeat(Math.max(heroHp, 0))}${'🤍'.repeat(Math.max(HERO_MAX_HP - heroHp, 0))}`;
     const w = Math.min(waveIndex + 1, WAVES.length);
-    line2.textContent = `🏰 ${lives}   💰 ${gold}   Wave ${w}/${WAVES.length}`;
+    livesEl.textContent = `🏰 ${lives}\u2003`;
+    goldEl.textContent = `💰 ${gold}`;
+    waveEl.textContent = `\u2003Wave ${w}/${WAVES.length}`;
     if (standingOn) {
       const t = standingOn;
       line3.textContent = t.level >= MAX_LEVEL
@@ -348,6 +492,7 @@ async function start(): Promise<void> {
       // reading a number.
       t.obj.scale.setScalar(1 + (t.level - 1) * 0.18);
       flashTint(t.obj, { color: 0xffe28a, ms: 320 });
+      updraft(t.obj.position);
       flashBanner(`${t.kind.label} → Lv${t.level}`);
       renderHud();
       return;
@@ -400,8 +545,7 @@ async function start(): Promise<void> {
     if (e.hp > 0) return;
     e.alive = false;
     e.obj.visible = false;
-    gold += e.bounty;
-    renderHud();
+    flyCoin(e.obj.position, e.bounty);
   };
 
   const hurtHero = (): void => {
@@ -425,6 +569,8 @@ async function start(): Promise<void> {
 
   let last = performance.now();
   const dir = new THREE.Vector3();
+  const prevPos = new THREE.Vector3();
+  const heroHit = new THREE.Vector3();
   renderer.setAnimationLoop((now: number) => {
     const dt = Math.min((now - last) / 1000, 0.05);
     last = now;
@@ -534,7 +680,7 @@ async function start(): Promise<void> {
           }
         } else if (e.shootCooldown > 0) {
           e.shootCooldown -= dt;
-        } else if (dHero < ENEMY_SHOOT_RANGE && dHero > ENEMY_MIN_SHOOT_RANGE) {
+        } else if (dHero < ENEMY_SHOOT_RANGE) {
           e.windup = ENEMY_WINDUP_SECONDS;
           e.shootCooldown = ENEMY_SHOOT_COOLDOWN;
           flashTint(e.obj, { color: 0xffd050, ms: ENEMY_WINDUP_SECONDS * 1000 });
@@ -571,11 +717,13 @@ async function start(): Promise<void> {
       for (let i = bullets.length - 1; i >= 0; i--) {
         const bu = bullets[i];
         bu.life -= dt;
+        prevPos.copy(bu.obj.position);
         bu.obj.position.addScaledVector(bu.vel, dt);
-        const hit = Math.hypot(
-          bu.obj.position.x - hero.position.x,
-          bu.obj.position.y - (hero.position.y + 0.3),
-          bu.obj.position.z - hero.position.z) < BULLET_HIT_RADIUS;
+        // Swept, not sampled. A bullet fired from touching distance covers the
+        // whole gap inside one frame, and a point test at each end would find
+        // it on neither side of the player it just went through.
+        const hit = segmentHitsSphere(prevPos, bu.obj.position,
+          heroHit.set(hero.position.x, hero.position.y + 0.3, hero.position.z), BULLET_HIT_RADIUS);
         if (hit || bu.life <= 0 || Math.abs(bu.obj.position.x) > 7 || Math.abs(bu.obj.position.z) > 7) {
           if (hit) hurtHero();
           world.scene.remove(bu.obj);
@@ -601,6 +749,7 @@ async function start(): Promise<void> {
       }
     }
 
+    updateUpdrafts(dt);
     updateTints(tinted);
     world.update(dt);
     renderer.render(world.scene, world.camera);
@@ -613,6 +762,7 @@ async function start(): Promise<void> {
       get towers() { return towers; },
       get shots() { return shots; },
       get bullets() { return bullets; },
+      get updrafts() { return updrafts; },
       state: () => ({ gold, lives, heroHp, waveIndex, running, won, buildCell, selected,
                       standingOn: standingOn ? { kind: standingOn.kind.id, level: standingOn.level } : null,
                       towers: towers.map((t) => ({ kind: t.kind.id, level: t.level, cell: t.cell })) }),
