@@ -115,16 +115,23 @@ hits, `RPG Audio` for the sword and the coins, `Interface Sounds` for build and
 refuse, `Digital Audio` for the upgrade chime, `Music Jingles` for the wave and
 win stingers.
 
-`src/audio.ts` plays them. Three things in there are the difference between
-"sound works" and "sound works on a phone":
+`src/audio.ts` plays them, through **Web Audio** — decoded once into buffers,
+played by throwaway source nodes.
 
-**Nothing may play before the player touches the screen.** Browsers block audio
-until a gesture and iOS is strictest, so the music waits for the first input
-and starts itself then. Autoplaying at load fails as an unhandled promise
-rejection in a console nobody reads, and the game is simply silent forever.
+**Do not use `HTMLAudioElement` for game sound.** The first version pooled about
+forty `<audio>` objects, which is fine on a desktop and is why this game ran at
+single-digit frames on an iPhone: iOS gives each element a real audio pipeline,
+caps how many can exist, and charges for every `play()`. Muting took the same
+scene from 11fps to a locked 60. Web Audio has none of that shape and overlap
+is free.
 
-**One `Audio` element cannot overlap itself.** Two towers firing in a frame
-would cut each other off, so each clip keeps a small pool.
+**Nothing may play before the player touches the screen.** The context starts
+suspended, browsers block audio until a gesture, and iOS is strictest — a
+SYNTHETIC click does not count, which is how a measurement run can end up
+testing the muted case and reporting that sound is free.
+
+**Load in parallel, music first.** Decoding one clip at a time queued the theme
+behind sixteen effects and left the first few swings silent.
 
 **Repeated sounds need a floor on retriggering.** Four ballistas reloading
 together turn one thwip into a buzz; a few tens of milliseconds of cooldown

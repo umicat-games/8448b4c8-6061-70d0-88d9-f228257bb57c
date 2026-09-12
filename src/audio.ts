@@ -1,47 +1,45 @@
 /**
- * Sound.
+ * Sound, through Web Audio.
  *
- * Deliberately small: HTMLAudioElement, no Web Audio graph, no mixing. A
- * tower defense needs a dozen short clips and one loop, and the browser is
- * already good at that.
+ * It was HTMLAudioElement first — sixteen clips, a small pool of elements each,
+ * about forty `<audio>` objects in total. That is fine on a desktop and it is
+ * the reason this game ran at single-digit frames on an iPhone: iOS gives an
+ * element a real audio pipeline, limits how many can exist, and charges for
+ * every `play()`. The user said "it got slow when you added sound" on day one;
+ * I A/B'd it on a laptop, measured no difference, and looked elsewhere for an
+ * hour. The laptop was the wrong machine to ask.
  *
- * Three things here are not obvious and all three are the difference between
- * "sound works" and "sound works on a phone":
+ * Web Audio has none of that shape: each clip is decoded ONCE into a buffer,
+ * and playing it allocates a source node that the browser throws away. Overlap
+ * is free, and there is nothing to pool.
  *
- * 1. **Nothing may play before the player touches the screen.** Browsers block
- *    audio until a gesture, and iOS is strictest. So the music waits for the
- *    first input and starts itself then, rather than failing at load with an
- *    unhandled promise rejection in the console and silence forever.
+ * What still needs care:
  *
- * 2. **One Audio element per clip cannot overlap itself.** Two towers firing
- *    in the same frame would cut each other off. Each clip keeps a small pool
- *    and rotates through it.
+ * 1. **The context starts suspended.** Browsers block audio until a gesture,
+ *    iOS strictest of all, and a SYNTHETIC click does not count — which is how
+ *    a measurement run of mine ended up silently testing the muted case and
+ *    reporting that sound was free.
  *
- * 3. **Repeated sounds need a floor on how often they retrigger.** Four
- *    ballistas reloading together turn one "thwip" into a buzz; a few tens of
- *    milliseconds of cooldown per clip fixes it without anyone noticing a
- *    dropped shot.
+ * 2. **Repeated sounds need a floor on retriggering.** Four ballistas
+ *    reloading together turn one thwip into a buzz.
  */
 
 interface ClipSpec {
-  /** Relative volume, 0-1. Balanced by ear against the music. */
   volume: number;
-  /** How many can overlap. Rapid sounds need more. */
-  voices?: number;
   /** Minimum gap between retriggers, in ms. */
   throttle?: number;
 }
 
 const CLIPS: Record<string, ClipSpec> = {
-  'tower-shot': { volume: 0.35, voices: 4, throttle: 45 },
-  'cannon-shot': { volume: 0.4, voices: 3, throttle: 60 },
-  'hit-enemy': { volume: 0.4, voices: 4, throttle: 30 },
-  'enemy-shot': { volume: 0.3, voices: 4, throttle: 40 },
-  'enemy-die': { volume: 0.5, voices: 3, throttle: 40 },
-  swing: { volume: 0.45, voices: 2, throttle: 120 },
-  'sword-hit': { volume: 0.55, voices: 3, throttle: 40 },
-  'hero-hurt': { volume: 0.7, voices: 2, throttle: 200 },
-  coin: { volume: 0.5, voices: 4, throttle: 40 },
+  'tower-shot': { volume: 0.35, throttle: 45 },
+  'cannon-shot': { volume: 0.4, throttle: 60 },
+  'hit-enemy': { volume: 0.4, throttle: 30 },
+  'enemy-shot': { volume: 0.3, throttle: 40 },
+  'enemy-die': { volume: 0.5, throttle: 40 },
+  swing: { volume: 0.45, throttle: 120 },
+  'sword-hit': { volume: 0.55, throttle: 40 },
+  'hero-hurt': { volume: 0.7, throttle: 200 },
+  coin: { volume: 0.5, throttle: 40 },
   build: { volume: 0.6 },
   upgrade: { volume: 0.65 },
   denied: { volume: 0.5 },
@@ -51,41 +49,25 @@ const CLIPS: Record<string, ClipSpec> = {
   lose: { volume: 0.7 },
 };
 
+const MUSIC_VOLUME = 0.28;
+
+type Ctx = AudioContext & { __umicat?: true };
+
 export class GameAudio {
-  private readonly pools = new Map<string, HTMLAudioElement[]>();
-  private readonly next = new Map<string, number>();
+  private ctx: Ctx | null = null;
+  private master: GainNode | null = null;
+  private musicGain: GainNode | null = null;
+  private musicSource: AudioBufferSourceNode | null = null;
+  private readonly buffers = new Map<string, AudioBuffer>();
   private readonly lastPlayed = new Map<string, number>();
-  private music: HTMLAudioElement | null = null;
   private muted = false;
   private unlocked = false;
 
   constructor(private readonly base = 'audio/') {
-    for (const [name, spec] of Object.entries(CLIPS)) {
-      const pool: HTMLAudioElement[] = [];
-      for (let i = 0; i < (spec.voices ?? 1); i++) {
-        const a = new Audio(`${this.base}${name}.ogg`);
-        a.preload = 'auto';
-        a.volume = spec.volume;
-        pool.push(a);
-      }
-      this.pools.set(name, pool);
-    }
-
-    this.music = new Audio(`${this.base}bgm.ogg`);
-    this.music.loop = true;
-    this.music.volume = 0.28;
-    this.music.preload = 'auto';
-
-    // The gesture that unlocks everything. `once` per event, and all of them
-    // removed together — a game that keeps listening after unlocking would
-    // restart the music every time the player taps.
     const unlock = (): void => {
-      this.unlocked = true;
-      if (!this.muted) void this.music?.play().catch(() => { /* still blocked; try again next gesture */ });
-      if (this.music && !this.music.paused) {
-        for (const ev of ['pointerdown', 'keydown', 'touchstart']) {
-          window.removeEventListener(ev, unlock);
-        }
+      void this.start();
+      if (this.unlocked) {
+        for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.removeEventListener(ev, unlock);
       }
     };
     for (const ev of ['pointerdown', 'keydown', 'touchstart']) {
@@ -93,37 +75,104 @@ export class GameAudio {
     }
   }
 
-  play(name: keyof typeof CLIPS | string): void {
-    if (this.muted || !this.unlocked) return;
-    const pool = this.pools.get(name);
-    if (!pool) return;
+  private async start(): Promise<void> {
+    if (this.unlocked) return;
+    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return;
+    if (!this.ctx) {
+      this.ctx = new AC() as Ctx;
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 1;
+      this.master.connect(this.ctx.destination);
+      this.musicGain = this.ctx.createGain();
+      this.musicGain.gain.value = MUSIC_VOLUME;
+      this.musicGain.connect(this.master);
+      void this.loadAll();
+    }
+    // Resuming has to happen inside the gesture's call stack on iOS.
+    void this.ctx.resume();
+    this.unlocked = this.ctx.state === 'running';
+    if (this.unlocked) this.startMusic();
+  }
+
+  private async loadAll(): Promise<void> {
+    // In parallel, and the music first.
+    //
+    // The first version fetched and decoded one at a time, out of caution about
+    // decode cost on the main thread. The cost of the caution was that every
+    // sound was late: the theme queued behind sixteen effects and started
+    // nearly a second in, and the first few swings were silent because their
+    // clip had not been decoded yet. `decodeAudioData` is asynchronous and off
+    // the main thread in every engine that matters; the caution was for a
+    // problem that does not exist, and it created a real one.
+    const load = async (name: string): Promise<void> => {
+      try {
+        const res = await fetch(`${this.base}${name}.ogg`);
+        const bytes = await res.arrayBuffer();
+        const buf = await this.ctx!.decodeAudioData(bytes);
+        // Tagged so a test can see WHICH clip played — a buffer has no name,
+        // and "some audio happened" is not a check.
+        (buf as AudioBuffer & { __name?: string }).__name = name;
+        this.buffers.set(name, buf);
+        if (name === 'bgm' && this.unlocked && !this.musicSource) this.startMusic();
+      } catch {
+        /* a clip that will not decode is not worth taking the game down for */
+      }
+    };
+    await load('bgm');
+    await Promise.all(Object.keys(CLIPS).map(load));
+  }
+
+  private startMusic(): void {
+    if (!this.ctx || !this.musicGain || this.musicSource || this.muted) return;
+    const buf = this.buffers.get('bgm');
+    if (!buf) return;            // still decoding; loadAll will call back
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    src.connect(this.musicGain);
+    src.start();
+    this.musicSource = src;
+  }
+
+  play(name: string): void {
+    if (this.muted || !this.unlocked || !this.ctx || !this.master) return;
+    const buf = this.buffers.get(name);
+    if (!buf) return;
+    const spec = CLIPS[name];
     const now = performance.now();
-    const gap = CLIPS[name]?.throttle ?? 0;
+    const gap = spec?.throttle ?? 0;
     if (gap && now - (this.lastPlayed.get(name) ?? -1e9) < gap) return;
     this.lastPlayed.set(name, now);
 
-    const i = (this.next.get(name) ?? 0) % pool.length;
-    this.next.set(name, i + 1);
-    const a = pool[i];
-    try {
-      a.currentTime = 0;
-      void a.play().catch(() => { /* a clip that will not play is not worth a crash */ });
-    } catch { /* currentTime can throw while a clip is still loading */ }
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    const g = this.ctx.createGain();
+    g.gain.value = spec?.volume ?? 0.5;
+    src.connect(g);
+    g.connect(this.master);
+    src.start();
+    // Nodes disconnect themselves when they end; without this they pile up as
+    // garbage the collector has to chase during play.
+    src.onended = () => { src.disconnect(); g.disconnect(); };
   }
 
-  /** Ducks the loop for a moment — for a jingle that should be heard over it. */
+  /** Ducks the music for a moment — for a jingle that should be heard over it. */
   duck(seconds = 3): void {
-    if (!this.music) return;
-    const from = this.music.volume;
-    this.music.volume = from * 0.25;
-    setTimeout(() => { if (this.music) this.music.volume = from; }, seconds * 1000);
+    if (!this.ctx || !this.musicGain) return;
+    const t = this.ctx.currentTime;
+    this.musicGain.gain.cancelScheduledValues(t);
+    this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
+    this.musicGain.gain.linearRampToValueAtTime(MUSIC_VOLUME * 0.25, t + 0.2);
+    this.musicGain.gain.linearRampToValueAtTime(MUSIC_VOLUME, t + seconds);
   }
 
   setMuted(on: boolean): void {
     this.muted = on;
-    if (!this.music) return;
-    if (on) this.music.pause();
-    else if (this.unlocked) void this.music.play().catch(() => {});
+    if (this.master && this.ctx) {
+      this.master.gain.setTargetAtTime(on ? 0 : 1, this.ctx.currentTime, 0.02);
+    }
+    if (!on && this.unlocked) this.startMusic();
   }
 
   get isMuted(): boolean { return this.muted; }
