@@ -27,7 +27,7 @@ const HERO_HALF_HEIGHT = 0.2;
 const HERO_RADIUS = 0.16;
 const HERO_SYNC_OFFSET = -(HERO_HALF_HEIGHT + HERO_RADIUS);
 const HERO_MAX_HP = 6;
-const HERO_SPEED = 3.0;
+const HERO_SPEED = 4.2;
 const HERO_ATTACK_RANGE = 1.15;
 const HERO_ATTACK_DAMAGE = 2;
 const HERO_INVINCIBLE_SECONDS = 1.4;
@@ -226,6 +226,10 @@ async function start(): Promise<void> {
     position: fixed; left: 50%; top: 38%; transform: translate(-50%, -50%);
     text-align: center; color: #fff; font: 700 26px/1.4 system-ui, sans-serif;
     text-shadow: 0 3px 10px rgba(0,0,0,.6); display: none; pointer-events: auto;
+    /* ABOVE the platform's touch layer, which is a full-screen z-index 10.
+       Without this the Play Again button is underneath the move zone and
+       tapping it does nothing at all — see CLAUDE.md. */
+    z-index: 40;
   `;
   document.body.appendChild(banner);
 
@@ -259,6 +263,11 @@ async function start(): Promise<void> {
 
   const endRun = (didWin: boolean): void => {
     running = false; won = didWin;
+    // Stop taking input and take the on-screen controls away. Both halves
+    // matter: the thumbstick would otherwise keep walking the character behind
+    // the dialog, and its full-screen layer would swallow the taps meant for
+    // the button on top of it.
+    input.setEnabled(false);
     if (waveIndex + 1 > bestWave) {
       bestWave = Math.min(waveIndex + 1, WAVES.length);
       void umicat.saves.set(SAVE_KEY, { best: bestWave });
