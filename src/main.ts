@@ -702,11 +702,23 @@ async function start(): Promise<void> {
   // numbers matter most.
   const debugHud = (() => {
         const d = document.createElement('div');
-        d.style.cssText = `position: fixed; right: 10px; bottom: 10px; z-index: 60;
-          font: 600 12px/1.45 ui-monospace, monospace; color: #fff; text-align: right;
-          background: rgba(0,0,0,.45); padding: 6px 9px; border-radius: 8px;
-          pointer-events: none; white-space: pre;`;
-        d.style.display = new URLSearchParams(location.search).has('debug') ? 'block' : 'none';
+        // TOP CENTRE, and never interactive. It started bottom-right, which is
+        // where the jump and attack buttons are — a readout added to diagnose
+        // performance covered the two controls a player needs most, and made
+        // itself the fourth thing this session to be perfectly visible and
+        // quietly in the way. The HUD owns the top left; this takes the gap.
+        d.style.cssText = `position: fixed; left: 50%; top: 8px; transform: translateX(-50%);
+          z-index: 60; font: 600 11px/1.4 ui-monospace, monospace; color: #fff;
+          text-align: center; background: rgba(0,0,0,.45); padding: 5px 9px;
+          border-radius: 8px; pointer-events: none; white-space: pre;`;
+        // Visible by default while performance is the open question. A hidden
+        // gesture is the wrong default for a number someone has to read out to
+        // me: `?debug=1` is unreachable in the app (no address bar) and three
+        // quick taps turned out to be fiddly enough that it looked broken.
+        // `?debug=0` turns it off; so does tapping it.
+        d.style.display = new URLSearchParams(location.search).get('debug') === '0' ? 'none' : 'block';
+        // No tap-to-dismiss: making it tappable is what put it in front of the
+        // buttons. `?debug=0` turns it off.
         document.body.appendChild(d);
         let taps = 0, tapAt = 0;
         hudEl.style.pointerEvents = 'auto';
