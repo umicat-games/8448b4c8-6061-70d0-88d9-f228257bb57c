@@ -343,7 +343,13 @@ async function start(): Promise<void> {
 
     if (!gameOver) {
       runTime += dt;
-      const dir = input.direction();
+      // Turn the camera from the right half of the screen, then walk relative
+      // to where it now points. The order matters: reading `look` first means
+      // this frame's movement already accounts for this frame's turn, instead
+      // of walking one frame in the old direction every time you swing round.
+      const turn = input.look();
+      if (turn.x || turn.y) world.orbit(turn.x, turn.y);
+      const dir = input.direction(world.cameraYaw);
       character.update(dt, dir, { jump: input.jump });
 
       // The floor under the floor.
