@@ -7,7 +7,7 @@ import {
   type Scene3D, type Manifest3D,
 } from '@umicat/three-sdk';
 import { GAME_WIDTH, GAME_HEIGHT } from './config';
-import { GameAudio } from './audio';
+import { createAudio } from './audio';
 
 /**
  * Woodland Defense — a tower defense you can walk around in.
@@ -162,7 +162,7 @@ async function start(): Promise<void> {
     fetch('scenes3d/path.json').then((r) => r.json() as Promise<{ cells: [number, number][]; spots: [number, number][] }>),
   ]);
   const world = await loadScene3D(scene3d, manifest, { assetBase: '', rapier: RAPIER });
-  const audio = new GameAudio();
+  const audio = createAudio();
 
   // --- Fold the board into a handful of draws ---
   //
