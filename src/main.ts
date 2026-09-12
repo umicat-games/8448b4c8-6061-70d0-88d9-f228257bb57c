@@ -219,8 +219,11 @@ async function start(): Promise<void> {
 
   const hero = world.entities.get('hero')!;
   const marker = world.entities.get('build_marker')!;
-  const saved = await umicat.saves.get<{ best: number }>(SAVE_KEY);
+  const saved = await umicat.saves.get<{ best: number; quality?: number }>(SAVE_KEY);
   let bestWave = saved?.best ?? 0;
+  /** 0 = smooth, 1 = sharp. Persisted, because a setting you have to find
+   *  again every run is a setting nobody uses. */
+  let quality = saved?.quality ?? 0;
 
   // The path the enemies walk is the same polyline the tiles were laid from,
   // so what you see and what they follow cannot drift apart.
@@ -285,23 +288,40 @@ async function start(): Promise<void> {
   // the fragments. `?dpr=2` to compare — the point is that this is decidable
   // by looking at the screen and the frame counter at the same time, on the
   // device, rather than by me picking a number on a laptop.
+  // --- Picture quality, as a button rather than a URL flag ---
+  //
+  // Two settings genuinely trade picture for speed: how many pixels are
+  // rendered, and how sharp shadows are. Which way to go is a matter of taste
+  // on a particular screen, so it is a toggle the player can press while
+  // looking at the game and the frame counter at the same time. (`?dpr=` and
+  // `?shadow=` still override it, for probes — but the app has no address bar,
+  // which is where the URL-flag version of this idea died.)
   const flags = new URLSearchParams(location.search);
-  const dpr = window.devicePixelRatio ?? 1;
   const dprFlag = Number(flags.get('dpr'));
-  renderer.setPixelRatio(dprFlag > 0 ? Math.min(dpr, dprFlag) : Math.min(dpr, dpr > 2 ? 1.5 : 2));
-
-  // Shadow crispness. The SDK sizes this for the device (1024, or 512 where the
-  // screen is dense); `?shadow=2048` to see what the extra sharpness is worth.
   const shadowFlag = Number(flags.get('shadow'));
-  if (shadowFlag > 0) {
-    for (const l of world.scene.children) {
-      const d = l as THREE.DirectionalLight;
-      if (!d.isDirectionalLight || !d.castShadow) continue;
-      d.shadow.mapSize.set(shadowFlag, shadowFlag);
-      d.shadow.map?.dispose();
-      d.shadow.map = null as unknown as THREE.WebGLRenderTarget;
+  const QUALITY = [
+    { name: 'Smooth', dpr: 1.5, shadow: 0 },   // shadow 0 = leave the SDK's choice
+    { name: 'Sharp', dpr: 2, shadow: 2048 },
+  ];
+
+  const applyQuality = (): void => {
+    const q = QUALITY[quality];
+    const screen = window.devicePixelRatio ?? 1;
+    renderer.setPixelRatio(Math.min(screen, dprFlag > 0 ? dprFlag : (screen > 2 ? q.dpr : 2)));
+    const size = shadowFlag > 0 ? shadowFlag : q.shadow;
+    if (size > 0) {
+      for (const l of world.scene.children) {
+        const d = l as THREE.DirectionalLight;
+        if (!d.isDirectionalLight || !d.castShadow) continue;
+        d.shadow.mapSize.set(size, size);
+        // The map is allocated at the old size; drop it so three.js rebuilds
+        // one. Changing mapSize alone does nothing at all.
+        d.shadow.map?.dispose();
+        d.shadow.map = null as unknown as THREE.WebGLRenderTarget;
+      }
     }
-  }
+    resize();
+  };
   renderer.shadowMap.enabled = true;
   const resize = (): void => {
     renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -310,6 +330,7 @@ async function start(): Promise<void> {
   };
   resize();
   window.addEventListener('resize', resize);
+  applyQuality();
 
   // --- Warm every shader before the game starts ---
   //
@@ -387,7 +408,7 @@ async function start(): Promise<void> {
   const muteBtn = document.createElement('button');
   muteBtn.textContent = '🔊';
   muteBtn.style.cssText = `
-    margin-top: 8px; width: 34px; height: 34px; border-radius: 50%; border: 0;
+    margin-top: 8px; width: 34px; height: 34px; border-radius: 17px; border: 0;
     background: rgba(0,0,0,.35); color: #fff; font-size: 15px; cursor: pointer;
     pointer-events: auto;   /* the HUD itself is click-through */
   `;
@@ -395,7 +416,21 @@ async function start(): Promise<void> {
     audio.setMuted(!audio.isMuted);
     muteBtn.textContent = audio.isMuted ? '🔇' : '🔊';
   };
-  hudEl.append(line1, line2, line3, muteBtn);
+  const qualityBtn = document.createElement('button');
+  qualityBtn.style.cssText = muteBtn.style.cssText + 'width: auto; padding: 0 11px; margin-left: 6px;';
+  const labelQuality = (): void => { qualityBtn.textContent = QUALITY[quality].name; };
+  qualityBtn.onclick = () => {
+    quality = (quality + 1) % QUALITY.length;
+    applyQuality();
+    labelQuality();
+    void umicat.saves.set(SAVE_KEY, { best: bestWave, quality });
+  };
+  labelQuality();
+
+  const buttons = document.createElement('div');
+  buttons.style.cssText = 'display: flex; align-items: center; pointer-events: auto;';
+  buttons.append(muteBtn, qualityBtn);
+  hudEl.append(line1, line2, line3, buttons);
 
   const banner = document.createElement('div');
   banner.style.cssText = `
@@ -570,7 +605,7 @@ async function start(): Promise<void> {
     audio.play(didWin ? 'win' : 'lose');
     if (waveIndex + 1 > bestWave) {
       bestWave = Math.min(waveIndex + 1, WAVES.length);
-      void umicat.saves.set(SAVE_KEY, { best: bestWave });
+      void umicat.saves.set(SAVE_KEY, { best: bestWave, quality });
     }
     banner.style.display = 'block';
     banner.innerHTML = didWin
@@ -975,6 +1010,8 @@ async function start(): Promise<void> {
       get shots() { return shots; },
       get bullets() { return bullets; },
       get updrafts() { return updrafts; },
+      quality: () => ({ level: quality, name: QUALITY[quality].name,
+                        pixelRatio: renderer.getPixelRatio() }),
       state: () => ({ gold, lives, heroHp, waveIndex, running, won, buildCell, selected,
                       standingOn: standingOn ? { kind: standingOn.kind.id, level: standingOn.level } : null,
                       towers: towers.map((t) => ({ kind: t.kind.id, level: t.level, cell: t.cell })) }),
