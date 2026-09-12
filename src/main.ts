@@ -3,155 +3,159 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import {
   ThreeUmicat, loadScene3D, loadModelAsset, attachToSocket, flashTint, updateTints,
   CharacterController3D, CharacterAnimator, Input3D,
-  type Scene3D, type Manifest3D, type LoadedScene3D,
+  type Scene3D, type Manifest3D,
 } from '@umicat/three-sdk';
 import { GAME_WIDTH, GAME_HEIGHT } from './config';
 
 /**
- * Woodland Brawl — a small action arena. Chase off the critters, don't get
- * chipped down to zero hearts, use the jump platforms to reach the guard
- * perched up top.
+ * Woodland Defense — a tower defense you can walk around in.
  *
- * Start here: `PLAYER_MAX_HP`, `ENEMY_DEFS`, and the frame loop in `start()`.
+ * The two halves have to earn each other. Towers alone is a tower defense with
+ * a camera; a hero alone is the brawler this used to be. So: towers are the
+ * only thing that holds a lane while you are somewhere else, and the hero is
+ * the only thing that can be somewhere else in time.
+ *
+ * Start here: `WAVES`, `TOWERS`, and the frame loop in `start()`.
  */
 
-const SAVE_KEY = 'highScore';
-
-const SPAWN = { x: 0, y: 0.4, z: 1.7 };
+const SAVE_KEY = 'td-progress';
+const SPAWN = { x: 0, y: 0.5, z: 3.5 };
 const RESPAWN_BELOW_Y = -5;
 
-const PLAYER_MAX_HP = 6;
-const PLAYER_HALF_HEIGHT = 0.2;
-const PLAYER_RADIUS = 0.16;
-const PLAYER_SYNC_OFFSET = -(PLAYER_HALF_HEIGHT + PLAYER_RADIUS); // capsule centre -> feet
+// --- the hero -------------------------------------------------------------
+const HERO_HALF_HEIGHT = 0.2;
+const HERO_RADIUS = 0.16;
+const HERO_SYNC_OFFSET = -(HERO_HALF_HEIGHT + HERO_RADIUS);
+const HERO_MAX_HP = 6;
+const HERO_SPEED = 3.0;
+const HERO_ATTACK_RANGE = 1.15;
+const HERO_ATTACK_DAMAGE = 2;
+const HERO_INVINCIBLE_SECONDS = 1.4;
 
-// A swing is a wide swipe in front of you, not a narrow poke — a cone tight
-// enough to miss anything not dead ahead reads as "the hit didn't count" even
-// when it clearly should have, especially since facing only turns while
-// moving. Range + an omnidirectional radius (rather than a facing cone) is a
-// deliberate concession to that: it is far more forgiving than realistic.
-const ATTACK_RANGE = 1.1;
-// A hit that doesn't move anything reads as having no weight, and it leaves
-// whatever's next to you free to keep touching you every cooldown tick. Both
-// get fixed by shoving the target back and freezing its AI for a beat.
-const KNOCKBACK_DIST = 0.5;
-const HIT_STUN_SECONDS = 0.4;
-// How long the player is untouchable right after taking a hit, and right at
-// the start of a run (so getting your bearings doesn't cost a heart).
-const HIT_INVINCIBLE_SECONDS = 1.6;
-const START_INVINCIBLE_SECONDS = 2.0;
-// --- Enemies swing at you rather than damaging you by touch. ---
-//
-// Contact damage is not a fight: standing next to something drains you on a
-// timer with nothing to react to, and backing off is the only counterplay
-// there has ever been. A wind-up you can see and step out of turns the same
-// numbers into an exchange.
-const ENEMY_ATTACK_RANGE = 0.72;
-/** The tell. Damage lands at the END of this, and only if you are still there. */
-const ENEMY_WINDUP_SECONDS = 0.34;
-const ENEMY_ATTACK_COOLDOWN = 1.5;
-/** How far a swing still reaches when it lands — slightly beyond the trigger,
- *  so stepping back has to be deliberate rather than accidental. */
-const ENEMY_REACH = 0.85;
+// --- enemies --------------------------------------------------------------
+/** They fly, so they float above the path rather than walking it. */
+const ENEMY_FLY_HEIGHT = 0.38;
+const ENEMY_MODEL_SCALE = 0.62;      // the kit's UFOs are a full tile wide
+/** How close a UFO comes before it shoots at the hero, and how hard. */
+const ENEMY_SHOOT_RANGE = 1.7;
+const ENEMY_SHOOT_COOLDOWN = 2.2;
+const ENEMY_WINDUP_SECONDS = 0.45;
 
-// Every critter shares a capsule sized for the kit's blob characters (they
-// stand a bit taller than the hero's own capsule).
-const ENEMY_HALF_HEIGHT = 0.26;
-const ENEMY_RADIUS = 0.19;
-const ENEMY_SYNC_OFFSET = -(ENEMY_HALF_HEIGHT + ENEMY_RADIUS);
-
-interface EnemyDef {
+// --- towers ---------------------------------------------------------------
+interface TowerKind {
   id: string;
-  modelAssetId: string;
-  spawn: { x: number; y: number; z: number };
-  /** How far it will stray from its spawn point while chasing — keeps the
-   *  platform guard from walking off the edge after the player. */
-  leash: number;
-  detectRadius: number;
-  speed: number;
-  hp: number;
-  /** Seconds since the run started before this one wakes up and starts
-   *  chasing. Without this every enemy in detect range converges on the
-   *  player in the opening seconds, before they've even found the controls —
-   *  staggering it means at most one or two are ever a threat at once early
-   *  on, and the rest show up as the fight goes on rather than all at once. */
-  activateAt: number;
+  label: string;
+  model: string;
+  ammo: string;
+  cost: number;
+  range: number;
+  damage: number;
+  /** Seconds between shots. */
+  reload: number;
+  /** How fast its shot travels, in units per second. */
+  shotSpeed: number;
 }
-
-const ENEMY_DEFS: EnemyDef[] = [
-  { id: 'enemy_oobi', modelAssetId: 'enemy-oobi', spawn: { x: -2.0, y: 0.5, z: -0.5 }, leash: 3.2, detectRadius: 2.6, speed: 1.35, hp: 2, activateAt: 0 },
-  { id: 'enemy_oodi', modelAssetId: 'enemy-oodi', spawn: { x: 2.0, y: 0.5, z: 2.6 }, leash: 3.2, detectRadius: 2.6, speed: 1.35, hp: 2, activateAt: 8 },
-  { id: 'enemy_ooli', modelAssetId: 'enemy-ooli', spawn: { x: -3.6, y: 0.5, z: 3.6 }, leash: 3.2, detectRadius: 2.6, speed: 1.35, hp: 2, activateAt: 16 },
-  { id: 'enemy_oopi', modelAssetId: 'enemy-oopi', spawn: { x: 0.0, y: 0.5, z: -4.6 }, leash: 3.2, detectRadius: 2.6, speed: 1.35, hp: 2, activateAt: 24 },
-  // Stationed on the top platform — its leash is short enough that it never
-  // wanders off the edge; the player has to climb up to reach it. Reaching it
-  // at all is already gated by the platform course, so it wakes up immediately.
-  { id: 'enemy_oozi', modelAssetId: 'enemy-oozi', spawn: { x: 5.4, y: 1.35, z: -3.0 }, leash: 0.35, detectRadius: 3.4, speed: 1.25, hp: 2, activateAt: 0 },
+const TOWERS: TowerKind[] = [
+  { id: 'ballista', label: 'Ballista', model: 'td-ballista', ammo: 'td-ammo-arrow',
+    cost: 25, range: 3.0, damage: 2, reload: 1.0, shotSpeed: 9 },
+  { id: 'cannon', label: 'Cannon', model: 'td-cannon', ammo: 'td-ammo-ball',
+    cost: 45, range: 2.2, damage: 5, reload: 2.0, shotSpeed: 7 },
 ];
 
-interface EnemyRuntime {
-  def: EnemyDef;
-  controller: CharacterController3D;
-  mesh: THREE.Object3D;
-  animator: CharacterAnimator | null;
-  alive: boolean;
-  dying: boolean;
+interface Wave { count: number; hp: number; speed: number; model: string; bounty: number; }
+const WAVES: Wave[] = [
+  { count: 5, hp: 6, speed: 1.1, model: 'td-ufo-a', bounty: 8 },
+  { count: 7, hp: 9, speed: 1.25, model: 'td-ufo-b', bounty: 10 },
+  { count: 9, hp: 14, speed: 1.35, model: 'td-ufo-c', bounty: 12 },
+  { count: 12, hp: 20, speed: 1.5, model: 'td-ufo-d', bounty: 16 },
+];
+const SPAWN_GAP = 1.1;          // seconds between enemies in a wave
+const WAVE_GAP = 6;             // breathing room between waves
+const START_GOLD = 60;
+const BASE_LIVES = 10;
+
+interface Enemy {
+  obj: THREE.Object3D;
   hp: number;
-  hitCooldown: number; // seconds until this enemy may swing again
-  /** Counts down through a wind-up; the blow lands when it reaches zero. */
+  maxHp: number;
+  speed: number;
+  bounty: number;
+  /** How far along the path, in cells. Fractional between waypoints. */
+  t: number;
+  alive: boolean;
+  shootCooldown: number;
   windup: number;
-  hitStun: number; // seconds left frozen + knocked back after being hit
-  dieTimer: number;
+}
+
+interface Tower {
+  kind: TowerKind;
+  obj: THREE.Object3D;
+  cell: [number, number];
+  reload: number;
+  level: number;
+}
+
+/** Levels 1-3. Everything about a tower scales off its level rather than being
+ *  stored per upgrade, so there is one place to change how upgrading feels. */
+const MAX_LEVEL = 3;
+const levelDamage = (t: Tower): number => t.kind.damage * Math.pow(1.7, t.level - 1);
+const levelRange = (t: Tower): number => t.kind.range * Math.pow(1.15, t.level - 1);
+const levelReload = (t: Tower): number => t.kind.reload * Math.pow(0.82, t.level - 1);
+const upgradeCost = (t: Tower): number => Math.round(t.kind.cost * 0.8 * t.level);
+
+interface Shot {
+  obj: THREE.Object3D;
+  target: Enemy;
+  damage: number;
+  speed: number;
 }
 
 async function start(): Promise<void> {
-  // 1) The platform. Do this first: reading the save before the first frame is
-  //    what makes a reload resume instead of restart.
   const umicat = await ThreeUmicat.init();
-
-  // 2) Physics. Rapier is WASM and must be initialised before use.
   await RAPIER.init();
 
-  // 3) The world, from design data on disk. Nothing here runs game logic —
-  //    same separation the 2D editor relies on (ADR-021).
-  const [manifest, scene3d] = await Promise.all([
+  const [manifest, scene3d, pathData] = await Promise.all([
     fetch('scenes3d/manifest.json').then((r) => r.json() as Promise<Manifest3D>),
     fetch('scenes3d/main.json').then((r) => r.json() as Promise<Scene3D>),
+    fetch('scenes3d/path.json').then((r) => r.json() as Promise<{ cells: [number, number][]; spots: [number, number][] }>),
   ]);
   const world = await loadScene3D(scene3d, manifest, { assetBase: '', rapier: RAPIER });
 
   const hero = world.entities.get('hero')!;
-  const bestScore = (await umicat.saves.get<number>(SAVE_KEY)) ?? 0;
+  const marker = world.entities.get('build_marker')!;
+  const saved = await umicat.saves.get<{ best: number }>(SAVE_KEY);
+  let bestWave = saved?.best ?? 0;
+
+  // The path the enemies walk is the same polyline the tiles were laid from,
+  // so what you see and what they follow cannot drift apart.
+  const PATH = pathData.cells;
+  const BUILDABLE = new Set(pathData.spots.map(([x, z]) => `${x},${z}`));
 
   const character = new CharacterController3D(world.world, RAPIER, {
-    position: SPAWN,
-    halfHeight: PLAYER_HALF_HEIGHT,
-    radius: PLAYER_RADIUS,
-    // ~4.2 character-heights a second. Fast enough that crossing the arena is
-    // not a chore, and comfortably quicker than the critters (1.35) so backing
-    // out of a fight is always available.
-    speed: 3.0,
-    stepHeight: 0.17,
-    jumpSpeed: 2.8,
+    position: SPAWN, halfHeight: HERO_HALF_HEIGHT, radius: HERO_RADIUS,
+    speed: HERO_SPEED, stepHeight: 0.17, jumpSpeed: 2.8,
   });
-  // The swing is declared, not drawn. Building the button here is what put it
-  // on top of the jump button on a phone -- same corner, and the platform's
-  // layer sits above, so the attack button could not be tapped at all.
-  const input = new Input3D({ actions: [{ id: 'attack', label: '⚔', keys: ['KeyJ'] }] });
+  const input = new Input3D({
+    actions: [
+      { id: 'attack', label: '⚔', keys: ['KeyJ'] },
+      { id: 'build', label: '🔨', keys: ['KeyB', 'KeyE'] },
+      { id: 'swap', label: '⇄', keys: ['KeyQ'] },
+    ],
+  });
 
   const heroMixer = world.mixerFor.get('hero');
+  // A hero with no mixer renders and walks around perfectly while never moving
+  // a limb, and nothing anywhere says so — the mixer only exists because the
+  // scene entity declares a starting clip. Refuse to start instead.
+  if (!heroMixer) {
+    throw new Error(
+      "the hero has no animation mixer — give its scene entity an `animation` " +
+      "block (e.g. { play: 'idle', loop: true }); without one it cannot animate at all");
+  }
   const clipMap: Record<string, string> =
     (manifest.models?.find((m) => m.id === 'hero') as { animations?: Record<string, string> } | undefined)?.animations ?? {};
-  const animator = heroMixer
-    ? new CharacterAnimator(heroMixer, world.clips.get('hero') ?? [], clipMap)
-    : null;
+  const animator = new CharacterAnimator(heroMixer, world.clips.get('hero') ?? [], clipMap);
 
-  // --- The sword. It hangs off a BONE, so it swings when the arm does; a
-  // weapon parented to the model root hovers politely beside a character
-  // doing all the work. The socket offset lives in the manifest next to the
-  // character, because it is a property of that rig -- which has no hand bone
-  // at all (root, two legs, torso, two arms, head), so "the hand" is a tuned
-  // point along the arm. ---
   const heroAsset = manifest.models?.find((m) => m.id === 'hero');
   const handRight = heroAsset?.sockets?.['hand-right'];
   if (handRight) {
@@ -160,38 +164,27 @@ async function start(): Promise<void> {
     attachToSocket(hero, handRight, sword);
   }
 
-  // Enemies: one CharacterController3D each, driven by a tiny chase-with-a-
-  // leash AI rather than input. Same controller the player uses, so they get
-  // the same wall/step/ground behaviour for free.
-  const enemies: EnemyRuntime[] = ENEMY_DEFS.map((def) => {
-    const mesh = world.entities.get(def.id)!;
-    const controller = new CharacterController3D(world.world, RAPIER, {
-      position: def.spawn,
-      halfHeight: ENEMY_HALF_HEIGHT,
-      radius: ENEMY_RADIUS,
-      speed: def.speed,
-      stepHeight: 0.17,
-      jumpSpeed: 0,
-    });
-    const mixer = world.mixerFor.get(def.id);
-    const clips = world.clips.get(def.modelAssetId) ?? [];
-    const enemyClipMap =
-      (manifest.models?.find((m) => m.id === def.modelAssetId) as { animations?: Record<string, string> } | undefined)?.animations ?? {};
-    const enemyAnimator = mixer ? new CharacterAnimator(mixer, clips, enemyClipMap) : null;
-    return {
-      def, controller, mesh, animator: enemyAnimator,
-      alive: true, dying: false, hp: def.hp, hitCooldown: 0, hitStun: 0, dieTimer: 0, windup: 0,
-    };
-  });
-  const totalEnemies = enemies.length;
+  // Prototypes, cloned per placement. Loading inside the build handler would
+  // put a download in the middle of a button press.
+  const protos = new Map<string, THREE.Object3D>();
+  for (const id of [...TOWERS.map((t) => t.model), ...TOWERS.map((t) => t.ammo), ...WAVES.map((w) => w.model)]) {
+    if (protos.has(id)) continue;
+    const { object } = await loadModelAsset(manifest, id, { assetBase: '' });
+    object.traverse((o) => { if ((o as THREE.Mesh).isMesh) { (o as THREE.Mesh).castShadow = true; } });
+    protos.set(id, object);
+  }
+  const spawnFrom = (id: string): THREE.Object3D => {
+    const o = protos.get(id)!.clone(true);
+    world.scene.add(o);
+    return o;
+  };
 
-  // 4) Render. The canvas is in index.html; the game owns the loop.
+  // --- render ---
   const canvas = document.getElementById('game') as HTMLCanvasElement;
-  const hud = document.getElementById('hud')!;
+  const hudEl = document.getElementById('hud')!;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
-
   const resize = (): void => {
     renderer.setSize(window.innerWidth, window.innerHeight, false);
     world.camera.aspect = window.innerWidth / window.innerHeight;
@@ -200,278 +193,371 @@ async function start(): Promise<void> {
   resize();
   window.addEventListener('resize', resize);
 
-  // --- HUD: hearts + kill counter, appended as children so we never wipe
-  // the SDK's own touch controls with a stray hud.textContent. ---
-  const heartsEl = document.createElement('div');
-  heartsEl.style.fontSize = '20px';
-  heartsEl.style.letterSpacing = '2px';
-  hud.appendChild(heartsEl);
+  // --- state ---
+  let gold = START_GOLD;
+  let lives = BASE_LIVES;
+  let heroHp = HERO_MAX_HP;
+  let waveIndex = 0;
+  let waveTimer = 3;            // countdown to the next wave
+  let spawnTimer = 0;
+  let toSpawn = 0;
+  let running = true;
+  let won = false;
+  let invincible = 1.5;
+  let selected = 0;             // which tower kind the build button places
+  let buildCell: [number, number] | null = null;
+  /** The tower under the player's feet, if any — the thing `build` upgrades. */
+  let standingOn: Tower | null = null;
 
-  const killsEl = document.createElement('div');
-  killsEl.style.marginTop = '4px';
-  hud.appendChild(killsEl);
+  const enemies: Enemy[] = [];
+  const towers: Tower[] = [];
+  const shots: Shot[] = [];
+  const tinted: THREE.Object3D[] = [hero];
 
-  const bestEl = document.createElement('div');
-  bestEl.style.marginTop = '2px';
-  bestEl.style.opacity = '0.8';
-  bestEl.style.fontSize = '13px';
-  hud.appendChild(bestEl);
+  // --- HUD ---
+  const line1 = document.createElement('div');
+  const line2 = document.createElement('div');
+  const line3 = document.createElement('div');
+  line3.style.opacity = '0.85';
+  hudEl.append(line1, line2, line3);
 
-  let playerHP = PLAYER_MAX_HP;
-  let killCount = 0;
-  const renderHud = (): void => {
-    heartsEl.textContent = '❤️'.repeat(Math.max(playerHP, 0)) + '🤍'.repeat(Math.max(PLAYER_MAX_HP - playerHP, 0));
-    killsEl.textContent = `Defeated ${killCount} / ${totalEnemies}`;
-    bestEl.textContent = `Best: ${bestScore}`;
-  };
-  renderHud();
-
-  // --- End-of-run overlay (win or lose), with a retry button. Lives in the
-  // HUD but re-enables pointer events for itself since #hud is click-through. ---
-  const overlay = document.createElement('div');
-  overlay.style.cssText = `
-    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
-    flex-direction: column; gap: 14px; background: rgba(10, 20, 15, 0.55);
-    pointer-events: auto; color: #fff; text-align: center; font: 600 20px/1.4 system-ui, sans-serif;
+  const banner = document.createElement('div');
+  banner.style.cssText = `
+    position: fixed; left: 50%; top: 38%; transform: translate(-50%, -50%);
+    text-align: center; color: #fff; font: 700 26px/1.4 system-ui, sans-serif;
+    text-shadow: 0 3px 10px rgba(0,0,0,.6); display: none; pointer-events: auto;
   `;
-  const overlayTitle = document.createElement('div');
-  overlayTitle.style.fontSize = '34px';
-  const overlaySubtitle = document.createElement('div');
-  overlaySubtitle.style.fontSize = '16px';
-  overlaySubtitle.style.opacity = '0.85';
-  const retryBtn = document.createElement('button');
-  retryBtn.textContent = 'Play Again';
-  retryBtn.style.cssText = `
-    pointer-events: auto; padding: 12px 28px; font: 600 18px system-ui, sans-serif;
-    border-radius: 999px; border: none; background: #ffd23f; color: #241a00; cursor: pointer;
-  `;
-  retryBtn.addEventListener('click', () => window.location.reload());
-  overlay.appendChild(overlayTitle);
-  overlay.appendChild(overlaySubtitle);
-  overlay.appendChild(retryBtn);
-  hud.appendChild(overlay);
+  document.body.appendChild(banner);
 
-  let gameOver = false;
-  const endRun = (won: boolean): void => {
-    if (gameOver) return;
-    gameOver = true;
-    overlayTitle.textContent = won ? 'Cleared the glade!' : 'Knocked out';
-    overlaySubtitle.textContent = won
-      ? `Every critter down. Score: ${killCount}`
-      : `Defeated ${killCount} of ${totalEnemies} before going down.`;
-    overlay.style.display = 'flex';
-    if (killCount > bestScore) {
-      void umicat.saves.set(SAVE_KEY, killCount).catch((err) => console.warn('[umicat] save failed', err));
-    }
-  };
-
-  // --- A screen-edge flash on taking a hit — cheap, immediate feedback that
-  // doesn't need any art. ---
   const hitFlash = document.createElement('div');
   hitFlash.style.cssText = `
-    position: fixed; inset: 0; pointer-events: none; background: rgba(220, 30, 30, 0);
+    position: fixed; inset: 0; pointer-events: none; background: rgba(220,30,30,0);
     transition: background 120ms ease-out;
   `;
   document.body.appendChild(hitFlash);
-  const flashHit = (): void => {
-    hitFlash.style.background = 'rgba(220, 30, 30, 0.35)';
-    setTimeout(() => { hitFlash.style.background = 'rgba(220, 30, 30, 0)'; }, 120);
+  const flashScreen = (): void => {
+    hitFlash.style.background = 'rgba(220,30,30,0.32)';
+    setTimeout(() => { hitFlash.style.background = 'rgba(220,30,30,0)'; }, 120);
   };
 
-  // Saving high scores is cheap and only on the score, so no coalescing needed
-  // here — writes only happen once, at the end of a run (see endRun).
-
-  const toEnemy = new THREE.Vector3();
-
-  const tryAttack = (): void => {
-    if (gameOver || !animator || animator.busy) return;
-    animator.play('attack');
-    for (const enemy of enemies) {
-      if (!enemy.alive || enemy.dying) continue;
-      toEnemy.set(enemy.mesh.position.x - hero.position.x, 0, enemy.mesh.position.z - hero.position.z);
-      const dist = toEnemy.length();
-      // A wide swipe around the player, not a narrow cone in front — facing
-      // only turns while moving, so requiring the player to be squared up
-      // made a clean hit whiff constantly. Range alone is far more forgiving.
-      if (dist > ATTACK_RANGE) continue;
-      // Also require the enemy to actually be near our height (don't hit the
-      // guard on the platform while standing on the ground below it).
-      if (Math.abs(enemy.mesh.position.y - hero.position.y) > 0.7) continue;
-      enemy.hp -= 1;
-      flashTint(enemy.mesh, { color: 0xff2a1a, ms: 180 });
-      if (enemy.hp <= 0) {
-        enemy.dying = true;
-        enemy.animator?.play('die', { interrupt: true });
-        continue;
-      }
-      // A hit that survives: shove it back and stun it for a beat, so
-      // landing a swing actually buys the player some breathing room instead
-      // of the critter just standing there taking the next tick of contact
-      // damage a moment later.
-      const pushDist = dist > 0.0001 ? 1 / dist : 0;
-      let kx = enemy.mesh.position.x + toEnemy.x * pushDist * KNOCKBACK_DIST;
-      let kz = enemy.mesh.position.z + toEnemy.z * pushDist * KNOCKBACK_DIST;
-      const fromSpawnX = kx - enemy.def.spawn.x;
-      const fromSpawnZ = kz - enemy.def.spawn.z;
-      const fromSpawnDist = Math.hypot(fromSpawnX, fromSpawnZ);
-      if (fromSpawnDist > enemy.def.leash && fromSpawnDist > 0.0001) {
-        const scale = enemy.def.leash / fromSpawnDist;
-        kx = enemy.def.spawn.x + fromSpawnX * scale;
-        kz = enemy.def.spawn.z + fromSpawnZ * scale;
-      }
-      enemy.controller.teleport({ x: kx, y: enemy.controller.position.y, z: kz });
-      enemy.hitStun = HIT_STUN_SECONDS;
+  const renderHud = (): void => {
+    line1.textContent = `${'❤️'.repeat(Math.max(heroHp, 0))}${'🤍'.repeat(Math.max(HERO_MAX_HP - heroHp, 0))}`;
+    const w = Math.min(waveIndex + 1, WAVES.length);
+    line2.textContent = `🏰 ${lives}   💰 ${gold}   Wave ${w}/${WAVES.length}`;
+    if (standingOn) {
+      const t = standingOn;
+      line3.textContent = t.level >= MAX_LEVEL
+        ? `${t.kind.label} Lv${t.level} — fully upgraded`
+        : `🔨 upgrade ${t.kind.label} to Lv${t.level + 1} · ${upgradeCost(t)}g`;
+    } else {
+      const kind = TOWERS[selected];
+      line3.textContent = buildCell
+        ? `🔨 build ${kind.label} · ${kind.cost}g · ⇄ swap`
+        : `walk to a spot beside the path to build · ⇄ ${kind.label}`;
     }
   };
 
-  // Left click swings, on desktop. Game-specific on purpose: the platform owns
-  // move / jump / look because every 3D game has them, and this one has an
-  // attack. `pointerType` filters out touch, where the ⚔ button already owns
-  // the swing and a click here would fire it twice.
+  const endRun = (didWin: boolean): void => {
+    running = false; won = didWin;
+    if (waveIndex + 1 > bestWave) {
+      bestWave = Math.min(waveIndex + 1, WAVES.length);
+      void umicat.saves.set(SAVE_KEY, { best: bestWave });
+    }
+    banner.style.display = 'block';
+    banner.innerHTML = didWin
+      ? `<div>All waves cleared</div><div style="font:600 15px/1.6 system-ui;opacity:.85">The woods are safe.</div>`
+      : `<div>${lives <= 0 ? 'The base fell' : 'You were knocked out'}</div>` +
+        `<div style="font:600 15px/1.6 system-ui;opacity:.85">Reached wave ${Math.min(waveIndex + 1, WAVES.length)} of ${WAVES.length}.</div>`;
+    const again = document.createElement('button');
+    again.textContent = 'Play Again';
+    again.style.cssText = `
+      margin-top: 14px; padding: 10px 20px; border-radius: 999px; border: 0;
+      font: 700 15px system-ui; background: #fff; color: #222; cursor: pointer;
+    `;
+    again.onclick = () => location.reload();
+    banner.appendChild(again);
+  };
+
+  // --- the path, as a position lookup -------------------------------------
+  const posAt = (t: number, out: THREE.Vector3): THREE.Vector3 => {
+    const i = Math.floor(t);
+    if (i >= PATH.length - 1) {
+      const last = PATH[PATH.length - 1];
+      return out.set(last[0], ENEMY_FLY_HEIGHT, last[1]);
+    }
+    const a = PATH[i], b = PATH[i + 1], f = t - i;
+    return out.set(a[0] + (b[0] - a[0]) * f, ENEMY_FLY_HEIGHT, a[1] + (b[1] - a[1]) * f);
+  };
+
+  // --- building ------------------------------------------------------------
+  const cellOf = (x: number, z: number): [number, number] =>
+    [Math.floor(x) + 0.5, Math.floor(z) + 0.5];
+  const occupied = new Map<string, Tower>();
+
+  /** One button, two jobs, decided by where you are standing.
+   *
+   *  A separate upgrade button would be a third thing on a phone screen that
+   *  already has four, to do something you can only ever do in one place —
+   *  standing on the tower. Where you are IS the selection in this game; that
+   *  is the whole difference from a tower defense you play with a cursor. */
+  const tryBuild = (): void => {
+    if (!running) return;
+
+    if (standingOn) {
+      const t = standingOn;
+      if (t.level >= MAX_LEVEL) { flashBanner(`${t.kind.label} is fully upgraded`); return; }
+      const cost = upgradeCost(t);
+      if (gold < cost) { flashBanner(`Upgrade costs ${cost}g`); return; }
+      gold -= cost;
+      t.level += 1;
+      // Bigger, so a levelled tower is legible from across the board without
+      // reading a number.
+      t.obj.scale.setScalar(1 + (t.level - 1) * 0.18);
+      flashTint(t.obj, { color: 0xffe28a, ms: 320 });
+      flashBanner(`${t.kind.label} → Lv${t.level}`);
+      renderHud();
+      return;
+    }
+
+    if (!buildCell) return;
+    const kind = TOWERS[selected];
+    if (gold < kind.cost) { flashBanner(`${kind.label} costs ${kind.cost}g`); return; }
+    gold -= kind.cost;
+    const obj = spawnFrom(kind.model);
+    obj.position.set(buildCell[0], 0.02, buildCell[1]);
+    const tower: Tower = { kind, obj, cell: [...buildCell] as [number, number], reload: 0, level: 1 };
+    towers.push(tower);
+    occupied.set(`${buildCell[0]},${buildCell[1]}`, tower);
+    tinted.push(obj);
+    renderHud();
+  };
+
+  let toastTimer: ReturnType<typeof setTimeout> | undefined;
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position: fixed; left: 50%; bottom: 22%; transform: translateX(-50%);
+    color: #fff; font: 600 15px system-ui; background: rgba(0,0,0,.45);
+    padding: 8px 14px; border-radius: 999px; pointer-events: none; display: none;
+  `;
+  document.body.appendChild(toast);
+  function flashBanner(text: string): void {
+    toast.textContent = text;
+    toast.style.display = 'block';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toast.style.display = 'none'; }, 1400);
+  }
+
+  // --- combat --------------------------------------------------------------
+  const tmp = new THREE.Vector3();
+  const heroAttack = (): void => {
+    if (!running || animator.busy) return;
+    animator.play('attack');
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      const d = Math.hypot(e.obj.position.x - hero.position.x, e.obj.position.z - hero.position.z);
+      if (d > HERO_ATTACK_RANGE) continue;
+      damage(e, HERO_ATTACK_DAMAGE);
+    }
+  };
+
+  const damage = (e: Enemy, amount: number): void => {
+    e.hp -= amount;
+    flashTint(e.obj, { color: 0xff3020, ms: 160 });
+    if (e.hp > 0) return;
+    e.alive = false;
+    e.obj.visible = false;
+    gold += e.bounty;
+    renderHud();
+  };
+
+  const hurtHero = (): void => {
+    if (invincible > 0 || !running) return;
+    invincible = HERO_INVINCIBLE_SECONDS;
+    heroHp -= 1;
+    flashScreen();
+    flashTint(hero, { color: 0xff2a1a, ms: 220 });
+    renderHud();
+    if (heroHp <= 0) endRun(false);
+  };
+
+  // Left click swings. `button`/`pointerType` checked because the right button
+  // is the camera and touch already has the ⚔ button — see CLAUDE.md.
   canvas.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 || e.pointerType === 'touch') return;
-    tryAttack();
+    heroAttack();
   });
 
-  // three.js deprecated Clock, and setAnimationLoop already hands us the
-  // timestamp, so there is nothing to replace it with.
-  // Untouchable for a couple of seconds at the start of the run — enough to
-  // get oriented before anything can land a hit.
-  let invincibleLeft = START_INVINCIBLE_SECONDS;
-  let runTime = 0;
-  const enemyDir = { x: 0, z: 0 };
-  const enemySpawnOffset = new THREE.Vector3();
+  renderHud();
 
-  const tinted: THREE.Object3D[] = [hero, ...enemies.map((e) => e.mesh)];
   let last = performance.now();
+  const dir = new THREE.Vector3();
   renderer.setAnimationLoop((now: number) => {
-    // Clamped: a backgrounded tab returns with a multi-second delta and
-    // everything tunnels through the floor in one step.
     const dt = Math.min((now - last) / 1000, 0.05);
     last = now;
 
-    if (!gameOver) {
-      runTime += dt;
-      // Turn the camera from the right half of the screen, then walk relative
-      // to where it now points. The order matters: reading `look` first means
-      // this frame's movement already accounts for this frame's turn, instead
-      // of walking one frame in the old direction every time you swing round.
-      const turn = input.look();
-      if (turn.x || turn.y) world.orbit(turn.x, turn.y);
-      const dir = input.direction(world.cameraYaw);
-      character.update(dt, dir, { jump: input.jump });
+    const turn = input.look();
+    if (turn.x || turn.y) world.orbit(turn.x, turn.y);
 
-      // The floor under the floor.
+    if (running) {
+      const move = input.direction(world.cameraYaw);
+      character.update(dt, move, { jump: input.jump });
       if (character.position.y < RESPAWN_BELOW_Y) character.teleport(SPAWN);
+      character.syncTo(hero, HERO_SYNC_OFFSET);
+      character.faceTowards(hero, move, dt);
 
-      character.syncTo(hero, PLAYER_SYNC_OFFSET);
-      character.faceTowards(hero, dir, dt);
+      if (input.consume('attack')) heroAttack();
+      if (input.consume('swap')) { selected = (selected + 1) % TOWERS.length; renderHud(); }
+      if (input.consume('build')) tryBuild();
+      animator.update(character.state);
+      if (invincible > 0) invincible -= dt;
 
-      // One press is one swing, latched at the event: a tap that starts and
-      // ends between two frames is invisible to a frame-to-frame edge check.
-      if (input.consume('attack')) tryAttack();
-      animator?.update(character.state);
+      // Where the player could build right now. Recomputed every frame because
+      // it is a function of where they are standing — a cached answer is one
+      // that is wrong the moment they walk.
+      const cell = cellOf(hero.position.x, hero.position.z);
+      const key = `${cell[0]},${cell[1]}`;
+      const here = occupied.get(key) ?? null;
+      const canBuild = !here && BUILDABLE.has(key);
+      const before = `${standingOn ? standingOn.cell.join(',') : ''}|${buildCell ? key : ''}`;
+      standingOn = here;
+      buildCell = canBuild ? cell : null;
+      // The ring marks anywhere the button will DO something, built or not —
+      // otherwise standing on your own tower looks like standing on grass.
+      marker.visible = canBuild || !!here;
+      if (marker.visible) marker.position.set(cell[0], 0.03, cell[1]);
+      if (before !== `${standingOn ? standingOn.cell.join(',') : ''}|${buildCell ? key : ''}`) renderHud();
 
-      if (invincibleLeft > 0) invincibleLeft -= dt;
-
-      // --- Enemies: chase within a leash, bump the player, die on 0 hp. ---
-      for (const enemy of enemies) {
-        if (!enemy.alive) continue;
-
-        if (enemy.dying) {
-          enemy.dieTimer += dt;
-          enemy.animator?.update('idle');
-          if (enemy.dieTimer > 0.9) {
-            enemy.alive = false;
-            enemy.mesh.visible = false;
-            killCount += 1;
+      // --- waves ---
+      if (toSpawn > 0) {
+        spawnTimer -= dt;
+        if (spawnTimer <= 0) {
+          spawnTimer = SPAWN_GAP;
+          toSpawn -= 1;
+          const w = WAVES[waveIndex];
+          const obj = spawnFrom(w.model);
+          obj.scale.setScalar(ENEMY_MODEL_SCALE);
+          const e: Enemy = {
+            obj, hp: w.hp, maxHp: w.hp, speed: w.speed, bounty: w.bounty,
+            t: 0, alive: true, shootCooldown: 1, windup: 0,
+          };
+          posAt(0, obj.position);
+          enemies.push(e);
+          tinted.push(obj);
+        }
+      } else if (enemies.every((e) => !e.alive)) {
+        waveTimer -= dt;
+        if (waveTimer <= 0) {
+          if (waveIndex >= WAVES.length) { endRun(true); }
+          else {
+            toSpawn = WAVES[waveIndex].count;
+            spawnTimer = 0;
+            waveTimer = WAVE_GAP;
             renderHud();
-            if (killCount >= totalEnemies) endRun(true);
           }
+        }
+      }
+
+      // --- enemies walk the path ---
+      for (const e of enemies) {
+        if (!e.alive) continue;
+        e.t += (e.speed * dt);
+        if (e.t >= PATH.length - 1) {
+          // It got through. That is what the towers were for.
+          e.alive = false;
+          e.obj.visible = false;
+          lives -= 1;
+          flashScreen();
+          renderHud();
+          if (lives <= 0) { endRun(false); break; }
           continue;
         }
+        posAt(e.t, e.obj.position);
+        e.obj.rotation.y += dt * 1.6;   // UFOs spin; it reads as "alive"
 
-        if (enemy.hitStun > 0) enemy.hitStun -= dt;
-        if (enemy.hitCooldown > 0) enemy.hitCooldown -= dt;
-
-        const pos = enemy.controller.position;
-        const dx = hero.position.x - pos.x;
-        const dz = hero.position.z - pos.z;
-        const distToPlayer = Math.hypot(dx, dz);
-
-        // Frozen for a beat after being hit, mid-swing, or not awake yet.
-        // Planting its feet to swing is what makes the wind-up readable.
-        const canChase = enemy.hitStun <= 0 && enemy.windup <= 0 && runTime >= enemy.def.activateAt;
-        enemyDir.x = 0; enemyDir.z = 0;
-        if (canChase && distToPlayer < enemy.def.detectRadius && distToPlayer > 0.001) {
-          const nx = dx / distToPlayer;
-          const nz = dz / distToPlayer;
-          // Leash: don't move further from spawn than allowed.
-          enemySpawnOffset.set(pos.x + nx * 0.1 - enemy.def.spawn.x, 0, pos.z + nz * 0.1 - enemy.def.spawn.z);
-          if (enemySpawnOffset.length() <= enemy.def.leash) {
-            enemyDir.x = nx; enemyDir.z = nz;
-          }
+        // Shooting the hero. Same shape as the tower's: a wind-up you can see
+        // and walk out of, rather than damage for standing nearby.
+        const dHero = Math.hypot(e.obj.position.x - hero.position.x, e.obj.position.z - hero.position.z);
+        if (e.windup > 0) {
+          e.windup -= dt;
+          if (e.windup <= 0 && dHero < ENEMY_SHOOT_RANGE + 0.3) hurtHero();
+        } else if (e.shootCooldown > 0) {
+          e.shootCooldown -= dt;
+        } else if (dHero < ENEMY_SHOOT_RANGE) {
+          e.windup = ENEMY_WINDUP_SECONDS;
+          e.shootCooldown = ENEMY_SHOOT_COOLDOWN;
+          flashTint(e.obj, { color: 0xffd050, ms: ENEMY_WINDUP_SECONDS * 1000 });
         }
-        enemy.controller.update(dt, enemyDir, {});
-        enemy.controller.syncTo(enemy.mesh, ENEMY_SYNC_OFFSET);
-        enemy.controller.faceTowards(enemy.mesh, enemyDir, dt);
-        // `update` drives the LOCOMOTION layer, which CharacterAnimator keeps
-        // underneath a one-shot — so this does not interrupt a swing.
-        enemy.animator?.update(enemy.controller.state === 'walk' ? 'walk' : 'idle');
+      }
 
-        // --- Swinging. Full 3D distance, so the guard on the platform can't
-        // reach a player standing on the ground below it. ---
-        const dy = enemy.mesh.position.y - hero.position.y;
-        const dist3d = Math.hypot(dx, dy, dz);
-
-        if (enemy.windup > 0) {
-          enemy.windup -= dt;
-          if (enemy.windup <= 0) {
-            // The blow lands NOW, and only if you are still standing there.
-            // That gap between the tell and the hit is the whole difference
-            // between a fight and a damage-over-time aura.
-            if (dist3d < ENEMY_REACH && invincibleLeft <= 0 && !gameOver) {
-              invincibleLeft = HIT_INVINCIBLE_SECONDS;
-              playerHP -= 1;
-              renderHud();
-              flashHit();
-              flashTint(hero, { color: 0xff2a1a, ms: 220 });
-              if (playerHP <= 0) endRun(false);
-            }
-          }
-        } else if (enemy.hitStun <= 0 && enemy.hitCooldown <= 0 && dist3d < ENEMY_ATTACK_RANGE) {
-          enemy.windup = ENEMY_WINDUP_SECONDS;
-          enemy.hitCooldown = ENEMY_ATTACK_COOLDOWN;
-          enemy.animator?.play('attack', { interrupt: true });
+      // --- towers shoot ---
+      for (const t of towers) {
+        t.reload -= dt;
+        // Nearest FIRST, not nearest overall: in a tower defense the one
+        // closest to the end is the one about to cost you a life.
+        let target: Enemy | null = null;
+        for (const e of enemies) {
+          if (!e.alive) continue;
+          const d = Math.hypot(e.obj.position.x - t.cell[0], e.obj.position.z - t.cell[1]);
+          if (d > levelRange(t)) continue;
+          if (!target || e.t > target.t) target = e;
         }
+        if (target) {
+          // Face it even while reloading — a turret tracking its target is how
+          // a player reads "this one is covering that corner".
+          t.obj.rotation.y = Math.atan2(
+            target.obj.position.x - t.cell[0], target.obj.position.z - t.cell[1]);
+        }
+        if (target && t.reload <= 0) {
+          t.reload = levelReload(t);
+          const shot = spawnFrom(t.kind.ammo);
+          shot.position.set(t.cell[0], 0.35, t.cell[1]);
+          shots.push({ obj: shot, target, damage: levelDamage(t), speed: t.kind.shotSpeed });
+        }
+      }
+
+      // --- shots fly ---
+      for (let i = shots.length - 1; i >= 0; i--) {
+        const s = shots[i];
+        if (!s.target.alive) { world.scene.remove(s.obj); shots.splice(i, 1); continue; }
+        dir.copy(s.target.obj.position).sub(s.obj.position);
+        const dist = dir.length();
+        if (dist < 0.25) {
+          damage(s.target, s.damage);
+          world.scene.remove(s.obj);
+          shots.splice(i, 1);
+          continue;
+        }
+        dir.normalize();
+        s.obj.position.addScaledVector(dir, Math.min(dist, s.speed * dt));
+        s.obj.lookAt(s.target.obj.position);
       }
     }
 
-    // Restore anything whose hit-flash has expired.
     updateTints(tinted);
-
-    world.update(dt); // animation + physics + follow camera
+    world.update(dt);
     renderer.render(world.scene, world.camera);
   });
 
-  // Handy while developing; harmless in a published build.
-  Object.assign(window as unknown as Record<string, unknown>,
-    // `locomotion` is part of the shape the shared 3D probes expect
-    // (umicat-infra/playwright/verify-3d-*.mjs). Keeping the handle uniform
-    // across games is what lets one harness check all of them.
-    { __game: {
-      umicat, world, character, input, animator, enemies,
-      locomotion: () => animator?.action || character.state,
-    } as unknown });
+  Object.assign(window as unknown as Record<string, unknown>, {
+    __game: {
+      umicat, world, character, input, animator,
+      get enemies() { return enemies; },
+      get towers() { return towers; },
+      get shots() { return shots; },
+      state: () => ({ gold, lives, heroHp, waveIndex, running, won, buildCell, selected,
+                      standingOn: standingOn ? { kind: standingOn.kind.id, level: standingOn.level } : null,
+                      towers: towers.map((t) => ({ kind: t.kind.id, level: t.level, cell: t.cell })) }),
+      build: () => tryBuild(),
+      locomotion: () => animator.action || character.state,
+    } as unknown,
+  });
+  void tmp;
 }
 
 void start().catch((err) => {
-  // A 3D game that fails to boot should say so rather than show a black canvas.
   const hud = document.getElementById('hud');
   if (hud) hud.textContent = `Failed to start: ${String(err)}`;
   console.error('[umicat] game failed to start', err);
 });
 
-// Referenced so the design canvas is not silently unused; a game that letterboxes
-// itself will want these.
 void GAME_WIDTH; void GAME_HEIGHT;

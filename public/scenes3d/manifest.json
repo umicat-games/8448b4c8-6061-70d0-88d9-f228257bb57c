@@ -48,118 +48,98 @@
       }
     },
     {
-      "id": "tree",
-      "path": "kit/platformer/tree.glb",
-      "importScale": 1
-    },
-    {
-      "id": "tree-pine",
-      "path": "kit/platformer/tree-pine.glb",
-      "importScale": 1
-    },
-    {
-      "id": "rocks",
-      "path": "kit/platformer/rocks.glb",
-      "importScale": 1
-    },
-    {
-      "id": "crate",
-      "path": "kit/platformer/crate.glb",
-      "importScale": 1
-    },
-    {
-      "id": "barrel",
-      "path": "kit/platformer/barrel.glb",
-      "importScale": 1
-    },
-    {
-      "id": "coin-gold",
-      "path": "kit/platformer/coin-gold.glb",
-      "importScale": 1
-    },
-    {
-      "id": "flag",
-      "path": "kit/platformer/flag.glb",
-      "importScale": 1
-    },
-    {
-      "id": "ladder",
-      "path": "kit/platformer/ladder.glb",
-      "importScale": 1
-    },
-    {
-      "id": "platform",
-      "path": "kit/platformer/platform.glb",
-      "importScale": 1
-    },
-    {
-      "id": "platform-fortified",
-      "path": "kit/platformer/platform-fortified.glb",
-      "importScale": 1
-    },
-    {
-      "id": "spring",
-      "path": "kit/platformer/spring.glb",
-      "importScale": 1
-    },
-    {
-      "id": "enemy-oobi",
-      "path": "kit/platformer/character-oobi.glb",
-      "importScale": 1,
-      "animations": {
-        "idle": "idle",
-        "walk": "walk",
-        "die": "die",
-        "attack": "attack-melee-right"
-      }
-    },
-    {
-      "id": "enemy-oodi",
-      "path": "kit/platformer/character-oodi.glb",
-      "importScale": 1,
-      "animations": {
-        "idle": "idle",
-        "walk": "walk",
-        "die": "die",
-        "attack": "attack-melee-right"
-      }
-    },
-    {
-      "id": "enemy-ooli",
-      "path": "kit/platformer/character-ooli.glb",
-      "importScale": 1,
-      "animations": {
-        "idle": "idle",
-        "walk": "walk",
-        "die": "die",
-        "attack": "attack-melee-right"
-      }
-    },
-    {
-      "id": "enemy-oopi",
-      "path": "kit/platformer/character-oopi.glb",
-      "importScale": 1,
-      "animations": {
-        "idle": "idle",
-        "walk": "walk",
-        "die": "die",
-        "attack": "attack-melee-right"
-      }
-    },
-    {
-      "id": "enemy-oozi",
-      "path": "kit/platformer/character-oozi.glb",
-      "importScale": 1,
-      "animations": {
-        "idle": "idle",
-        "walk": "walk",
-        "die": "die",
-        "attack": "attack-melee-right"
-      }
-    },
-    {
       "id": "sword",
       "path": "kit/weapons/weapon-sword.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-tile",
+      "path": "kit/td/tile.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-tile-straight",
+      "path": "kit/td/tile-straight.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-tile-corner",
+      "path": "kit/td/tile-corner-square.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-tile-spawn",
+      "path": "kit/td/tile-spawn.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-tile-end",
+      "path": "kit/td/tile-end.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-selection",
+      "path": "kit/td/selection-a.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-ballista",
+      "path": "kit/td/weapon-ballista.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-cannon",
+      "path": "kit/td/weapon-cannon.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-ammo-arrow",
+      "path": "kit/td/weapon-ammo-arrow.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-ammo-ball",
+      "path": "kit/td/weapon-ammo-cannonball.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-ufo-a",
+      "path": "kit/td/enemy-ufo-a.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-ufo-b",
+      "path": "kit/td/enemy-ufo-b.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-ufo-c",
+      "path": "kit/td/enemy-ufo-c.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-ufo-d",
+      "path": "kit/td/enemy-ufo-d.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-tree",
+      "path": "kit/td/detail-tree.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-rocks",
+      "path": "kit/td/detail-rocks.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-crystal",
+      "path": "kit/td/detail-crystal.glb",
+      "importScale": 1
+    },
+    {
+      "id": "td-tile-dirt",
+      "path": "kit/td/tile-dirt.glb",
       "importScale": 1
     }
   ]

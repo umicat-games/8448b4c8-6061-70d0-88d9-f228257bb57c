@@ -8,11 +8,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "scene": "node tools/gen-scene.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.14.0",
-    "@umicat/three-sdk": "^0.8.1",
+    "@umicat/three-sdk": "^0.8.2",
     "three": "^0.186.0"
   },
   "devDependencies": {
