@@ -106,3 +106,26 @@ zero tracks, silently).
 manifest maps the ones a game reaches for by semantic name; **`run` is called
 `sprint` inside the file** — which is why clips are mapped by meaning and never
 guessed.
+
+## Sound
+
+`public/audio/*.ogg`, all Kenney, all CC0 — `Music Loops` for the theme and the
+game-over track, `Sci-Fi Sounds` for lasers and explosions, `Impact Sounds` for
+hits, `RPG Audio` for the sword and the coins, `Interface Sounds` for build and
+refuse, `Digital Audio` for the upgrade chime, `Music Jingles` for the wave and
+win stingers.
+
+`src/audio.ts` plays them. Three things in there are the difference between
+"sound works" and "sound works on a phone":
+
+**Nothing may play before the player touches the screen.** Browsers block audio
+until a gesture and iOS is strictest, so the music waits for the first input
+and starts itself then. Autoplaying at load fails as an unhandled promise
+rejection in a console nobody reads, and the game is simply silent forever.
+
+**One `Audio` element cannot overlap itself.** Two towers firing in a frame
+would cut each other off, so each clip keeps a small pool.
+
+**Repeated sounds need a floor on retriggering.** Four ballistas reloading
+together turn one thwip into a buzz; a few tens of milliseconds of cooldown
+fixes it and nobody notices a dropped shot.

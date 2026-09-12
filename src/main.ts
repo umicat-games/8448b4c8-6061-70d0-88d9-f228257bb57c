@@ -6,6 +6,7 @@ import {
   type Scene3D, type Manifest3D,
 } from '@umicat/three-sdk';
 import { GAME_WIDTH, GAME_HEIGHT } from './config';
+import { GameAudio } from './audio';
 
 /**
  * Woodland Defense — a tower defense you can walk around in.
@@ -160,6 +161,7 @@ async function start(): Promise<void> {
     fetch('scenes3d/path.json').then((r) => r.json() as Promise<{ cells: [number, number][]; spots: [number, number][] }>),
   ]);
   const world = await loadScene3D(scene3d, manifest, { assetBase: '', rapier: RAPIER });
+  const audio = new GameAudio();
 
   const hero = world.entities.get('hero')!;
   const marker = world.entities.get('build_marker')!;
@@ -240,6 +242,8 @@ async function start(): Promise<void> {
   let heroHp = HERO_MAX_HP;
   let waveIndex = 0;
   let waveTimer = 3;            // countdown to the next wave
+  /** Whether the wave at `waveIndex` has actually been sent out yet. */
+  let waveLaunched = false;
   let spawnTimer = 0;
   let toSpawn = 0;
   let running = true;
@@ -268,7 +272,18 @@ async function start(): Promise<void> {
   const waveEl = document.createElement('span');
   goldEl.style.transition = 'transform 120ms ease-out';
   line2.append(livesEl, goldEl, waveEl);
-  hudEl.append(line1, line2, line3);
+  const muteBtn = document.createElement('button');
+  muteBtn.textContent = '🔊';
+  muteBtn.style.cssText = `
+    margin-top: 8px; width: 34px; height: 34px; border-radius: 50%; border: 0;
+    background: rgba(0,0,0,.35); color: #fff; font-size: 15px; cursor: pointer;
+    pointer-events: auto;   /* the HUD itself is click-through */
+  `;
+  muteBtn.onclick = () => {
+    audio.setMuted(!audio.isMuted);
+    muteBtn.textContent = audio.isMuted ? '🔇' : '🔊';
+  };
+  hudEl.append(line1, line2, line3, muteBtn);
 
   const banner = document.createElement('div');
   banner.style.cssText = `
@@ -403,6 +418,7 @@ async function start(): Promise<void> {
       if (k < 1) { requestAnimationFrame(step); return; }
       coin.remove();
       gold += amount;
+      audio.play('coin');
       renderHud();
       // A nudge on arrival, so the counter acknowledges being hit.
       goldEl.style.transform = 'scale(1.22)';
@@ -437,6 +453,9 @@ async function start(): Promise<void> {
     // the dialog, and its full-screen layer would swallow the taps meant for
     // the button on top of it.
     input.setEnabled(false);
+    // The ending gets the room to itself.
+    audio.duck(10);
+    audio.play(didWin ? 'win' : 'lose');
     if (waveIndex + 1 > bestWave) {
       bestWave = Math.min(waveIndex + 1, WAVES.length);
       void umicat.saves.set(SAVE_KEY, { best: bestWave });
@@ -483,9 +502,9 @@ async function start(): Promise<void> {
 
     if (standingOn) {
       const t = standingOn;
-      if (t.level >= MAX_LEVEL) { flashBanner(`${t.kind.label} is fully upgraded`); return; }
+      if (t.level >= MAX_LEVEL) { audio.play('denied'); flashBanner(`${t.kind.label} is fully upgraded`); return; }
       const cost = upgradeCost(t);
-      if (gold < cost) { flashBanner(`Upgrade costs ${cost}g`); return; }
+      if (gold < cost) { audio.play('denied'); flashBanner(`Upgrade costs ${cost}g`); return; }
       gold -= cost;
       t.level += 1;
       // Bigger, so a levelled tower is legible from across the board without
@@ -493,6 +512,7 @@ async function start(): Promise<void> {
       t.obj.scale.setScalar(1 + (t.level - 1) * 0.18);
       flashTint(t.obj, { color: 0xffe28a, ms: 320 });
       updraft(t.obj.position);
+      audio.play('upgrade');
       flashBanner(`${t.kind.label} → Lv${t.level}`);
       renderHud();
       return;
@@ -500,7 +520,7 @@ async function start(): Promise<void> {
 
     if (!buildCell) return;
     const kind = TOWERS[selected];
-    if (gold < kind.cost) { flashBanner(`${kind.label} costs ${kind.cost}g`); return; }
+    if (gold < kind.cost) { audio.play('denied'); flashBanner(`${kind.label} costs ${kind.cost}g`); return; }
     gold -= kind.cost;
     const obj = spawnFrom(kind.model);
     obj.position.set(buildCell[0], 0.02, buildCell[1]);
@@ -508,6 +528,7 @@ async function start(): Promise<void> {
     towers.push(tower);
     occupied.set(`${buildCell[0]},${buildCell[1]}`, tower);
     tinted.push(obj);
+    audio.play('build');
     renderHud();
   };
 
@@ -531,18 +552,25 @@ async function start(): Promise<void> {
   const heroAttack = (): void => {
     if (!running || animator.busy) return;
     animator.play('attack');
+    audio.play('swing');
+    let connected = false;
     for (const e of enemies) {
       if (!e.alive) continue;
       const d = Math.hypot(e.obj.position.x - hero.position.x, e.obj.position.z - hero.position.z);
       if (d > HERO_ATTACK_RANGE) continue;
+      connected = true;
       damage(e, HERO_ATTACK_DAMAGE);
     }
+    // A swing that connects sounds different from one that whiffs. Without
+    // that, melee is a noise you make rather than a thing you do.
+    if (connected) audio.play('sword-hit');
   };
 
   const damage = (e: Enemy, amount: number): void => {
     e.hp -= amount;
     flashTint(e.obj, { color: 0xff3020, ms: 160 });
-    if (e.hp > 0) return;
+    if (e.hp > 0) { audio.play('hit-enemy'); return; }
+    audio.play('enemy-die');
     e.alive = false;
     e.obj.visible = false;
     flyCoin(e.obj.position, e.bounty);
@@ -552,6 +580,7 @@ async function start(): Promise<void> {
     if (invincible > 0 || !running) return;
     invincible = HERO_INVINCIBLE_SECONDS;
     heroHp -= 1;
+    audio.play('hero-hurt');
     flashScreen();
     flashTint(hero, { color: 0xff2a1a, ms: 220 });
     renderHud();
@@ -586,7 +615,7 @@ async function start(): Promise<void> {
       character.faceTowards(hero, move, dt);
 
       if (input.consume('attack')) heroAttack();
-      if (input.consume('swap')) { selected = (selected + 1) % TOWERS.length; renderHud(); }
+      if (input.consume('swap')) { selected = (selected + 1) % TOWERS.length; audio.play('build'); renderHud(); }
       if (input.consume('build')) tryBuild();
       animator.update(character.state);
       if (invincible > 0) invincible -= dt;
@@ -627,11 +656,18 @@ async function start(): Promise<void> {
       } else if (enemies.every((e) => !e.alive)) {
         waveTimer -= dt;
         if (waveTimer <= 0) {
+          // Advance FIRST, then launch. Without the increment this re-launched
+          // wave one forever: every mechanic worked, the HUD read "Wave 1/4"
+          // the whole time, and the game could not be won or lost to anything
+          // but the first five critters.
+          if (waveLaunched) { waveIndex += 1; waveLaunched = false; }
           if (waveIndex >= WAVES.length) { endRun(true); }
           else {
             toSpawn = WAVES[waveIndex].count;
             spawnTimer = 0;
             waveTimer = WAVE_GAP;
+            waveLaunched = true;
+            audio.play('wave');
             renderHud();
           }
         }
@@ -646,6 +682,7 @@ async function start(): Promise<void> {
           e.alive = false;
           e.obj.visible = false;
           lives -= 1;
+          audio.play('leak');
           flashScreen();
           renderHud();
           if (lives <= 0) { endRun(false); break; }
@@ -677,6 +714,7 @@ async function start(): Promise<void> {
             bullet.position.copy(e.obj.position).addScaledVector(v, BULLET_MUZZLE);
             bullet.lookAt(bullet.position.clone().add(v));
             bullets.push({ obj: bullet, vel: v.multiplyScalar(BULLET_SPEED), life: BULLET_LIFE });
+            audio.play('enemy-shot');
           }
         } else if (e.shootCooldown > 0) {
           e.shootCooldown -= dt;
@@ -710,6 +748,7 @@ async function start(): Promise<void> {
           const shot = spawnFrom(t.kind.ammo);
           shot.position.set(t.cell[0], 0.35, t.cell[1]);
           shots.push({ obj: shot, target, damage: levelDamage(t), speed: t.kind.shotSpeed });
+          audio.play(t.kind.id === 'cannon' ? 'cannon-shot' : 'tower-shot');
         }
       }
 
