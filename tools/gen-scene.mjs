@@ -101,6 +101,7 @@ add({
   // Visible only as a skirt around and below the tiles.
   primitive: { kind: 'box', size: { x: 13, y: 0.4, z: 13 }, color: '#3f6b38' },
   transform: { position: { x: 0, y: GROUND_Y - 0.4, z: 0 } },
+  castShadow: false,
   // Offset so the collider's TOP lands at y=0 — the tiles' own top surface.
   collider: {
     shape: { kind: 'box', halfExtents: { x: 6.5, y: 0.3, z: 6.5 } },
@@ -116,6 +117,9 @@ for (let gx = -5.5; gx <= 5.5; gx += 1) {
     add({
       id: `grass_${gx}_${gz}`.replace(/[.-]/g, '_'), name: 'grass', modelAssetId: 'td-tile',
       transform: { position: { x: gx, y: GROUND_Y - TILE_TOP, z: gz } },
+      // Flat ground casting onto flat ground draws nothing anyone can see and
+      // costs a second full draw of the mesh every frame.
+      castShadow: false,
     });
   }
 }
@@ -142,7 +146,7 @@ for (let i = 0; i < cells.length; i++) {
   const outDir = next ? [next[0] - c[0], next[1] - c[1]] : null;
   const { model, rot } = tileFor(inDir, outDir);
   add({
-    id: `path_${i}`, name: `path_${i}`, modelAssetId: model,
+    id: `path_${i}`, name: `path_${i}`, modelAssetId: model, castShadow: false,
     // Sunk so the tiles' TOP is the walkable surface — laid ON the ground they
     // would be a 0.2 step the character cannot climb (stepHeight is 0.17).
     transform: { position: { x: c[0], y: GROUND_Y - TILE_TOP, z: c[1] }, rotation: rot },

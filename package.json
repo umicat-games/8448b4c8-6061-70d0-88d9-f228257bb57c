@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.14.0",
-    "@umicat/three-sdk": "^0.8.4",
+    "@umicat/three-sdk": "^0.8.5",
     "three": "^0.186.0"
   },
   "devDependencies": {

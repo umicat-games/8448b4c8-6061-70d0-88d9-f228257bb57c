@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
   ThreeUmicat, loadScene3D, loadModelAsset, attachToSocket, flashTint, updateTints,
@@ -163,6 +164,59 @@ async function start(): Promise<void> {
   const world = await loadScene3D(scene3d, manifest, { assetBase: '', rapier: RAPIER });
   const audio = new GameAudio();
 
+  // --- Fold the board into a handful of draws ---
+  //
+  // The board is 144 grass tiles plus 38 path tiles, and every one of them was
+  // a separate mesh: 182 draw calls for a picture that never changes. They are
+  // static, they share a few materials, and nothing looks them up by id, so
+  // they can be merged into one mesh per material. A desktop does not notice
+  // 182 draws; a phone very much does.
+  const staticTiles: THREE.Object3D[] = [];
+  for (const [id, obj] of world.entities) {
+    if (id.startsWith('grass_') || id.startsWith('path_')) staticTiles.push(obj);
+  }
+  {
+    const byMaterial = new Map<string, { mat: THREE.Material; geos: THREE.BufferGeometry[] }>();
+    for (const obj of staticTiles) {
+      obj.updateWorldMatrix(true, true);
+      obj.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+        const key = mat.uuid;
+        // Bake each tile's world transform into its vertices — after merging
+        // there is one object, so the individual transforms have nowhere left
+        // to live.
+        const g = mesh.geometry.clone();
+        g.applyMatrix4(mesh.matrixWorld);
+        // Merging requires identical attribute sets; drop anything unshared
+        // rather than letting mergeGeometries return null and silently lose
+        // the entire board.
+        for (const name of Object.keys(g.attributes)) {
+          if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
+        }
+        const slot = byMaterial.get(key) ?? { mat, geos: [] };
+        slot.geos.push(g);
+        byMaterial.set(key, slot);
+      });
+    }
+    let merged = 0;
+    for (const { mat, geos } of byMaterial.values()) {
+      const combined = mergeGeometries(geos, false);
+      if (!combined) continue;   // mismatched attributes: leave those tiles be
+      const mesh = new THREE.Mesh(combined, mat);
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false;
+      world.scene.add(mesh);
+      merged += geos.length;
+      for (const g of geos) g.dispose();
+    }
+    if (merged > 0) {
+      for (const obj of staticTiles) { obj.removeFromParent(); world.entities.delete(obj.userData.entityId as string); }
+    }
+  }
+
   const hero = world.entities.get('hero')!;
   const marker = world.entities.get('build_marker')!;
   const saved = await umicat.saves.get<{ best: number }>(SAVE_KEY);
@@ -226,7 +280,11 @@ async function start(): Promise<void> {
   const canvas = document.getElementById('game') as HTMLCanvasElement;
   const hudEl = document.getElementById('hud')!;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  // A phone reports 3 and gets 1.5, not 2. Two means four times the fragments
+  // of a 1x screen, and on a board this size that was the difference between
+  // smooth and visibly dropping frames — for a sharpness nobody asked about.
+  const dpr = window.devicePixelRatio ?? 1;
+  renderer.setPixelRatio(Math.min(dpr, dpr > 2 ? 1.5 : 2));
   renderer.shadowMap.enabled = true;
   const resize = (): void => {
     renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -596,6 +654,25 @@ async function start(): Promise<void> {
 
   renderHud();
 
+  // A frame counter, on the device that matters.
+  //
+  // `?debug=1` — because the numbers that decide performance questions have to
+  // come from the phone. A laptop renders this board without noticing 182 draw
+  // calls; an iPhone draws at 3x into a 2048 shadow map and very much does, and
+  // nothing about a screenshot from either machine shows the difference.
+  const debugHud = new URLSearchParams(location.search).has('debug')
+    ? (() => {
+        const d = document.createElement('div');
+        d.style.cssText = `position: fixed; right: 10px; bottom: 10px; z-index: 60;
+          font: 600 12px/1.45 ui-monospace, monospace; color: #fff; text-align: right;
+          background: rgba(0,0,0,.45); padding: 6px 9px; border-radius: 8px;
+          pointer-events: none; white-space: pre;`;
+        document.body.appendChild(d);
+        return d;
+      })()
+    : null;
+  let fpsFrames = 0, fpsSince = performance.now(), fpsWorst = 0;
+
   let last = performance.now();
   const dir = new THREE.Vector3();
   const prevPos = new THREE.Vector3();
@@ -785,6 +862,20 @@ async function start(): Promise<void> {
         dir.normalize();
         s.obj.position.addScaledVector(dir, Math.min(dist, s.speed * dt));
         s.obj.lookAt(s.target.obj.position);
+      }
+    }
+
+    if (debugHud) {
+      fpsFrames += 1;
+      fpsWorst = Math.max(fpsWorst, dt * 1000);
+      if (now - fpsSince > 500) {
+        const fps = (fpsFrames * 1000) / (now - fpsSince);
+        const info = renderer.info.render;
+        debugHud.textContent =
+          `${fps.toFixed(0)} fps   worst ${fpsWorst.toFixed(0)}ms\n` +
+          `${info.calls} draws  ${(info.triangles / 1000).toFixed(0)}k tris\n` +
+          `dpr ${window.devicePixelRatio} → ${renderer.getPixelRatio()}  ${renderer.domElement.width}×${renderer.domElement.height}`;
+        fpsFrames = 0; fpsSince = now; fpsWorst = 0;
       }
     }
 
