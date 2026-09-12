@@ -324,6 +324,15 @@ async function start(): Promise<void> {
     }
   };
 
+  // Left click swings, on desktop. Game-specific on purpose: the platform owns
+  // move / jump / look because every 3D game has them, and this one has an
+  // attack. `pointerType` filters out touch, where the ⚔ button already owns
+  // the swing and a click here would fire it twice.
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || e.pointerType === 'touch') return;
+    tryAttack();
+  });
+
   // three.js deprecated Clock, and setAnimationLoop already hands us the
   // timestamp, so there is nothing to replace it with.
   // Untouchable for a couple of seconds at the start of the run — enough to
