@@ -6,9 +6,9 @@
     "background": "#8fc9e8"
   },
   "gravity": {
-    "x": 0.0,
+    "x": 0,
     "y": -4.1692,
-    "z": 0.0
+    "z": 0
   },
   "lights": [
     {
@@ -44,9 +44,9 @@
       },
       "transform": {
         "position": {
-          "x": 0.0,
-          "y": 0.0,
-          "z": 0.0
+          "x": 0,
+          "y": 0,
+          "z": 0
         }
       },
       "collider": {
@@ -192,8 +192,8 @@
       "transform": {
         "position": {
           "x": -3.2,
-          "y": 0.0,
-          "z": -3.0
+          "y": 0,
+          "z": -3
         }
       },
       "collider": {
@@ -220,7 +220,7 @@
       "transform": {
         "position": {
           "x": -4.4,
-          "y": 0.0,
+          "y": 0,
           "z": -1.4
         }
       },
@@ -248,7 +248,7 @@
       "transform": {
         "position": {
           "x": 3.4,
-          "y": 0.0,
+          "y": 0,
           "z": -3.2
         }
       },
@@ -275,9 +275,9 @@
       "modelAssetId": "crate",
       "transform": {
         "position": {
-          "x": 1.4,
-          "y": 0.0,
-          "z": -2.2
+          "x": 0.010026576094443573,
+          "y": 0,
+          "z": 1.9332585064511196
         }
       },
       "collider": {
@@ -304,7 +304,7 @@
       "transform": {
         "position": {
           "x": 2.2,
-          "y": 0.0,
+          "y": 0,
           "z": -2.4
         }
       },
@@ -331,7 +331,7 @@
       "modelAssetId": "coin-gold",
       "transform": {
         "position": {
-          "x": 0.0,
+          "x": 0,
           "y": 0.35,
           "z": -1.2
         }
@@ -344,7 +344,7 @@
       "transform": {
         "position": {
           "x": -1.6,
-          "y": 0.0,
+          "y": 0,
           "z": -3.6
         }
       }
@@ -356,7 +356,7 @@
       "transform": {
         "position": {
           "x": 4.2,
-          "y": 0.0,
+          "y": 0,
           "z": 0.4
         }
       }
@@ -380,7 +380,7 @@
       "transform": {
         "position": {
           "x": -2.4,
-          "y": 0.0,
+          "y": 0,
           "z": 1.6
         }
       }
@@ -391,8 +391,8 @@
       "name": "hero",
       "transform": {
         "position": {
-          "x": 0.0,
-          "y": 0.0,
+          "x": 0,
+          "y": 0,
           "z": 1.7
         }
       },
@@ -406,7 +406,7 @@
     "kind": "follow",
     "target": "hero",
     "offset": {
-      "x": 0.0,
+      "x": 0,
       "y": 1.105,
       "z": 2.3375
     },
